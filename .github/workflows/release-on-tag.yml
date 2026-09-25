@@ -1,0 +1,115 @@
+name: Publish tagged release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android toolchain
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.1.0"
+
+      - name: Build release APK
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/*.apk "release-assets/LogVarRemoteDemo-$GITHUB_REF_NAME.apk"
+
+      - name: Download unified FULL dependency inputs
+        run: |
+          set -euo pipefail
+          mkdir -p work/bootstrap out
+
+          curl -L --fail --retry 5 --retry-delay 2             -o work/node.zip             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node.zip" | sha256sum -c -
+
+          curl -L --fail --retry 5 --retry-delay 2             -o work/node-modules.zip             "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
+          echo "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7  work/node-modules.zip" | sha256sum -c -
+
+          BASE="https://raw.githubusercontent.com/lilixu3/danmu-api-android/4d75ca0420d2946956b34ed8c835b4912870a987/app/src/main/assets/nodejs-project"
+          for name in main.js android-server.js favorite-scheduler-host.js runtime-polyfills.js startup-failure.js worker-proxy.js; do
+            curl -L --fail --retry 5 --retry-delay 2 -o "work/bootstrap/$name" "$BASE/$name"
+          done
+
+          curl -L --fail --retry 5 --retry-delay 2             -o work/core-source.zip             "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
+
+      - name: Build all ABI dependency packages
+        env:
+          NODE_VERSION: "24.21.0-0"
+          NODE_FLAVOR: "full"
+          NODE_UPSTREAM_SHA256: "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76"
+          SHELL_COMMIT: "4d75ca0420d2946956b34ed8c835b4912870a987"
+          RUNTIME_PACK_SHA256: "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"
+          CORE_COMMIT: "280b2327ccf06fb5e32a1db7051025359121a2c1"
+        run: |
+          python3 .github/scripts/package_remote_deps.py
+          cp out/* release-assets/
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+
+      - name: Generate release notes
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          text = Path(".release/CHANGELOG.md").read_text(encoding="utf-8")
+          marker = f"## {tag}"
+          if marker in text:
+              section = text.split(marker, 1)[1]
+              section = section.split("\n## ", 1)[0].strip()
+              notes = f"## {tag}\n\n{section}\n"
+          else:
+              notes = f"## {tag}\n\nTagged source release.\n"
+
+          notes += """
+### Release assets
+
+All three Android ABIs are first-class and independently packaged:
+
+- arm64-v8a
+- armeabi-v7a
+- x86_64
+
+They use the same Node.js Mobile FULL version, the same Android Bootstrap, the same node_modules pack and the same LogVar Core. Only ABI-specific native Node files differ.
+
+The release also contains the universal APK, common dependency ZIPs, remote-deps-manifest.json and SHA256SUMS.txt.
+"""
+          Path("release-notes.md").write_text(notes, encoding="utf-8")
+
+      - name: Create/update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME"               --repo "$GH_REPO"               --target "$GITHUB_SHA"               --title "LogVar Remote Demo $GITHUB_REF_NAME"               --notes-file release-notes.md
+          else
+            gh release edit "$GITHUB_REF_NAME"               --repo "$GH_REPO"               --title "LogVar Remote Demo $GITHUB_REF_NAME"               --notes-file release-notes.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" release-assets/* --repo "$GH_REPO" --clobber
