@@ -1,0 +1,10 @@
+Artifact preparation environment check (2026-09-25):
+- Java available: OpenJDK 21
+- CMake available
+- Gradle: NOT installed
+- Android SDK / sdkmanager: NOT installed
+- Android NDK: NOT installed
+
+Therefore this container cannot execute :app:assembleRelease locally.
+The repository includes a GitHub Actions workflow that installs the pinned toolchain and builds release.
+No APK has been fabricated or mislabeled as built.
