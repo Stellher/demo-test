@@ -1,63 +1,132 @@
 # LogVar Remote Runtime Demo
 
-Android Studio / Jetpack Compose / MVVM Demo：APK 不内置 Node.js `libnode.so`、LogVar Core 或 `node_modules`，首次使用时从固定远程版本下载到 App 私有目录并启动本地 LogVar。
+Android Studio / Jetpack Compose / MVVM Demo。Node.js Mobile、LogVar Core 与 Node 依赖均采用远程 Runtime 架构。
 
-## 当前功能
+## Runtime 发行策略
 
-- 远程下载并校验 Node.js Mobile、LogVar Core、Android bootstrap 与移动端 node_modules。
-- App 内启动 `127.0.0.1:19321` 的 LogVar 主服务与 `19322` 代理端口。
-- Compose **全 API 调试器**：当前目录覆盖 46 个路由操作，包括 Runtime、业务搜索/匹配/弹幕、FongMi/短地址兼容、收藏、本地弹幕 CRUD、日志/请求记录、缓存、环境变量、Cookie、AI、Forward Trace 和 Proxy。
-- App 内 **LogVar 官方本地 Web 面板**：WebView 打开 Core 自带 `danmu_api/ui`，支持 JavaScript、DOM Storage 和文件选择，因此本地弹幕 multipart 上传也可直接操作。
-- 本地 Demo 将 `ADMIN_TOKEN` 与 `TOKEN` 对齐，仅监听 `127.0.0.1`，便于完整调试系统管理接口。
+从 **v0.5.0** 起，三个 Android ABI 完全平级：
 
-## 架构
+- `arm64-v8a`
+- `armeabi-v7a`
+- `x86_64`
 
-```text
-Compose UI
-   ├─ Runtime
-   ├─ Full API Debugger
-   └─ LocalPanelActivity (WebView)
-          ↓
-HomeViewModel
-          ↓
-LogVarRepository
-   ├─ RuntimeInstaller
-   ├─ NodeRuntimeManager
-   ├─ ApiDebugClient
-   └─ LogVarLocalClient
-          ↓
-127.0.0.1:19321 / 19322
-```
+没有“主 ABI”。每个 ABI 都独立发布：
 
-## API 调试器
+- `node-runtime-full-<abi>-24.21.0-0.zip`
+- `logvar-runtime-full-<abi>-24.21.0-0.zip`
 
-路由来源按当前固定版本核对：
-
-- `lilixu3/danmu_api` commit `280b2327ccf06fb5e32a1db7051025359121a2c1`
-- `lilixu3/danmu-api-android` commit `4d75ca0420d2946956b34ed8c835b4912870a987`
-
-每个 API 可编辑 Path、Query 和 JSON Body，并显示实际请求 URL、HTTP 状态码、耗时、响应头和响应体。
-
-本地弹幕上传是 `multipart/form-data`，Compose 调试器会列出该路由；实际文件上传直接进入本地 Web 面板完成。
-
-## 本地面板
-
-Node 启动后点击 **打开 LogVar 本地面板**：
+三个 ABI 统一使用完全相同的依赖集合：
 
 ```text
-http://127.0.0.1:19321/87654321/
+Node.js Mobile  FULL 24.21.0-0
+Bootstrap       4d75ca04
+node_modules    4be12e7971f0
+LogVar Core     280b2327
 ```
 
-这是 LogVar Core 自带的 UI，不是另外伪造的静态页面。
+只有 Native Node Runtime 的 ABI 不同；Bootstrap、node_modules、LogVar Core 均为 ABI-independent，并且由同一套确定性打包流程生成。
 
-## 构建
+## GitHub Release
 
-GitHub Actions 已验证：
+每一个源码 Tag 都对应一个 GitHub Release。Release 包含：
 
-```bash
-gradle :app:assembleRelease
+```text
+LogVarRemoteDemo-vX.Y.Z.apk
+
+node-runtime-full-arm64-v8a-24.21.0-0.zip
+node-runtime-full-armeabi-v7a-24.21.0-0.zip
+node-runtime-full-x86_64-24.21.0-0.zip
+
+logvar-runtime-full-arm64-v8a-24.21.0-0.zip
+logvar-runtime-full-armeabi-v7a-24.21.0-0.zip
+logvar-runtime-full-x86_64-24.21.0-0.zip
+
+logvar-android-bootstrap-4d75ca04.zip
+logvar-node-modules-4be12e7971f0.zip
+logvar-core-280b2327.zip
+
+remote-deps-manifest.json
+SHA256SUMS.txt
 ```
 
-工具链：JDK 17、SDK 36、Build Tools 36.0.0、NDK 28.2.13676358、CMake 3.22.1、Gradle 9.1.0、AGP 9.0.1、Kotlin/Compose 2.4.0。
+GitHub 自身还会为每个 Tag 自动提供 Source code ZIP / tar.gz。
 
-Release Demo 暂时使用 debug signing config，正式发布请替换为自己的 release keystore。
+历史版本 `v0.1.0 ~ v0.4.0` 使用补档 workflow 建立对应 Release，并按各版本当时的 Runtime 体系归档，不用当前版本依赖冒充历史依赖。
+
+## App 下载逻辑
+
+App 根据 `Build.SUPPORTED_ABIS` 选择当前设备支持的 ABI：
+
+```text
+Build.SUPPORTED_ABIS
+       ↓
+选择 arm64-v8a / armeabi-v7a / x86_64
+       ↓
+下载该 ABI 对应的 FULL LogVar Runtime Bundle
+       ↓
+SHA-256 校验
+       ↓
+解压 runtime/ + project/
+       ↓
+dlopen(libnode.so)
+       ↓
+启动本地 LogVar
+```
+
+每台设备只下载自己 ABI 的 Native Runtime，不下载另外两个 ABI。
+
+## Bundle 结构
+
+```text
+logvar-runtime-full-<abi>-24.21.0-0.zip
+├── runtime/
+│   └── libnode.so
+└── project/
+    ├── main.js
+    ├── android-server.js
+    ├── favorite-scheduler-host.js
+    ├── runtime-polyfills.js
+    ├── startup-failure.js
+    ├── worker-proxy.js
+    ├── node_modules/
+    ├── danmu_api_stable/
+    ├── config/.env
+    └── tmp/
+```
+
+## 功能
+
+- Compose + MVVM。
+- 远程 Node / LogVar Runtime。
+- FULL Node.js Mobile。
+- 全 LogVar API 调试器。
+- App 内 LogVar Web 面板。
+- WebView 文件选择 / 本地弹幕上传。
+- 环境变量持久化。
+- ABI 独立 Runtime 下载。
+- SHA-256 完整性验证。
+- 确定性 ZIP 构建。
+- Git Tag / Release 自动发布与历史版本归档。
+
+## 本地服务
+
+```text
+Main API:  http://127.0.0.1:19321
+Proxy:     http://127.0.0.1:19322
+Token:     87654321
+```
+
+Runtime 只监听 localhost。
+
+## 构建工具链
+
+- JDK 17
+- Android SDK 36
+- Build Tools 36.0.0
+- NDK 28.2.13676358
+- CMake 3.22.1
+- Gradle 9.1.0
+- AGP 9.0.1
+- Kotlin / Compose 2.4.0
+
+Release Demo 当前仍使用 debug signing config，正式发布时请替换为自己的 release keystore。
