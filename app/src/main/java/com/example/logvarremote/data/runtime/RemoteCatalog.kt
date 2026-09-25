@@ -9,7 +9,7 @@ object RemoteCatalog {
         "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"
     const val CORE_COMMIT = "280b2327ccf06fb5e32a1db7051025359121a2c1"
 
-    private const val RELEASE_TAG = "runtime-full-v24.21.0-0-v0.4.0"
+    private const val RELEASE_TAG = "v0.5.0"
     private const val RELEASE_BASE =
         "https://github.com/Stellher/demo-test/releases/download/$RELEASE_TAG"
 
