@@ -9,6 +9,10 @@
         android:theme="@style/Theme.LogVarRemoteDemo"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".LocalPanelActivity"
+            android:exported="false"
+            android:hardwareAccelerated="true" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
