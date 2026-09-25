@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            TAG="${{ steps.meta.outputs.tag }}"
+            TAG="$GITHUB_REF_NAME"
           else
             TAG="$(tr -d '[:space:]' < .release/VERSION)"
           fi
@@ -99,11 +99,13 @@ jobs:
 
       - name: Generate release notes
         shell: python
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           import os
           from pathlib import Path
 
-          tag = os.environ["GITHUB_REF_NAME"]
+          tag = os.environ["RELEASE_TAG"]
           text = Path(".release/CHANGELOG.md").read_text(encoding="utf-8")
           marker = f"## {tag}"
           if marker in text:
