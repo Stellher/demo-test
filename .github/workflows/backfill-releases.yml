@@ -1,0 +1,185 @@
+name: Backfill historical releases
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/backfill-releases.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        tag:
+          - v0.1.0
+          - v0.2.0
+          - v0.2.1
+          - v0.3.0
+          - v0.3.1
+          - v0.3.2
+          - v0.4.0
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+          fetch-depth: 0
+
+      - name: Checkout historical source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.tag }}
+          path: source
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Android toolchain
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.1.0"
+
+      - name: Build historical APK
+        working-directory: source
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          mkdir -p ../release-assets
+          cp app/build/outputs/apk/release/*.apk "../release-assets/LogVarRemoteDemo-${{ matrix.tag }}.apk"
+
+      - name: Download common pinned LogVar inputs
+        run: |
+          set -euo pipefail
+          mkdir -p work/bootstrap
+          curl -L --fail --retry 5 --retry-delay 2             -o work/node-modules.zip             "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
+          echo "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7  work/node-modules.zip" | sha256sum -c -
+
+          BASE="https://raw.githubusercontent.com/lilixu3/danmu-api-android/4d75ca0420d2946956b34ed8c835b4912870a987/app/src/main/assets/nodejs-project"
+          for name in main.js android-server.js favorite-scheduler-host.js runtime-polyfills.js startup-failure.js worker-proxy.js; do
+            curl -L --fail --retry 5 --retry-delay 2 -o "work/bootstrap/$name" "$BASE/$name"
+          done
+
+          curl -L --fail --retry 5 --retry-delay 2             -o work/core-source.zip             "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
+
+      - name: Package dependency set matching historical version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ matrix.tag }}"
+
+          package_flavor() {
+            FLAVOR="$1"
+            OUT="$2"
+            mkdir -p "$OUT"
+
+            if [ "$FLAVOR" = "lite" ]; then
+              URL="https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-lite-24.21.0-0.zip"
+              HASH="1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c"
+            else
+              URL="https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+              HASH="e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76"
+            fi
+
+            curl -L --fail --retry 5 --retry-delay 2 -o work/node.zip "$URL"
+            echo "$HASH  work/node.zip" | sha256sum -c -
+
+            NODE_VERSION="24.21.0-0"             NODE_FLAVOR="$FLAVOR"             NODE_UPSTREAM_SHA256="$HASH"             SHELL_COMMIT="4d75ca0420d2946956b34ed8c835b4912870a987"             RUNTIME_PACK_SHA256="4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"             CORE_COMMIT="280b2327ccf06fb5e32a1db7051025359121a2c1"             OUT_DIR="$OUT"             python3 tooling/.github/scripts/package_remote_deps.py
+          }
+
+          case "$TAG" in
+            v0.1.0|v0.2.0|v0.2.1|v0.3.0)
+              package_flavor lite out-lite
+              cp out-lite/* release-assets/
+              mv release-assets/remote-deps-manifest.json release-assets/remote-deps-manifest-lite.json
+
+              # The historical installer itself pointed at the upstream universal lite archive.
+              curl -L --fail --retry 5 --retry-delay 2                 -o release-assets/node-runtime-lite-android-universal-24.21.0-0.zip                 "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-lite-24.21.0-0.zip"
+              ;;
+
+            v0.3.1)
+              package_flavor lite out-lite
+              cp out-lite/* release-assets/
+              mv release-assets/remote-deps-manifest.json release-assets/remote-deps-manifest-lite.json
+
+              package_flavor full out-full
+              cp out-full/* release-assets/
+              mv release-assets/remote-deps-manifest.json release-assets/remote-deps-manifest-full.json
+
+              curl -L --fail --retry 5 --retry-delay 2                 -o release-assets/node-runtime-lite-android-universal-24.21.0-0.zip                 "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-lite-24.21.0-0.zip"
+              curl -L --fail --retry 5 --retry-delay 2                 -o release-assets/node-runtime-full-android-universal-24.21.0-0.zip                 "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+              ;;
+
+            v0.3.2|v0.4.0)
+              package_flavor full out-full
+              cp out-full/* release-assets/
+              mv release-assets/remote-deps-manifest.json release-assets/remote-deps-manifest-full.json
+              ;;
+
+            *)
+              echo "Unknown historical tag: $TAG"
+              exit 1
+              ;;
+          esac
+
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+
+      - name: Generate historical release notes
+        shell: python
+        env:
+          TAG: ${{ matrix.tag }}
+        run: |
+          import os
+          from pathlib import Path
+
+          tag = os.environ["TAG"]
+          text = Path("tooling/.release/CHANGELOG.md").read_text(encoding="utf-8")
+          marker = f"## {tag}"
+          section = "Historical source snapshot."
+          if marker in text:
+              section = text.split(marker, 1)[1].split("\n## ", 1)[0].strip()
+
+          notes = f"""## {tag}
+
+{section}
+
+### Backfilled release files
+
+This Release was backfilled after the original development milestone so each source tag has a complete downloadable archive.
+
+- The APK is built from the exact tagged source.
+- Dependency packages use the versions pinned by this project generation: Node.js Mobile 24.21.0-0, Android Bootstrap 4d75ca04, runtime pack 4be12e7971f0 and LogVar Core 280b2327.
+- Native Node packages are separated by arm64-v8a, armeabi-v7a and x86_64.
+- ABI-independent Bootstrap, node_modules and LogVar Core are shared across ABI variants.
+- SHA256SUMS.txt records every uploaded file.
+"""
+          Path("historical-release-notes.md").write_text(notes, encoding="utf-8")
+
+      - name: Create/update historical GitHub Release
+        run: |
+          TAG="${{ matrix.tag }}"
+          if ! gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release create "$TAG"               --repo "$GH_REPO"               --verify-tag               --title "LogVar Remote Demo $TAG"               --notes-file historical-release-notes.md
+          else
+            gh release edit "$TAG"               --repo "$GH_REPO"               --title "LogVar Remote Demo $TAG"               --notes-file historical-release-notes.md
+          fi
+          gh release upload "$TAG" release-assets/* --repo "$GH_REPO" --clobber
