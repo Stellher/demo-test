@@ -71,7 +71,16 @@ class RuntimeInstaller(
             File(projectStaging, "danmu_api_stable")
         )
         File(projectStaging, "tmp").mkdirs()
-        File(projectStaging, "config").mkdirs()
+        val stagingConfigDir = File(projectStaging, "config").apply { mkdirs() }
+        val stagingEnvFile = File(stagingConfigDir, ".env")
+
+        // Preserve Web-panel configuration across runtime repair/update.
+        // Fresh installs still need a physical .env because LogVar NodeHandler refuses to save without it.
+        if (paths.envFile.isFile) {
+            paths.envFile.copyTo(stagingEnvFile, overwrite = true)
+        } else {
+            stagingEnvFile.writeText("")
+        }
 
         validateStaging(runtimeStaging, projectStaging)
         makeNativeFilesLoadable(runtimeStaging)
@@ -109,6 +118,7 @@ class RuntimeInstaller(
         check(File(project, "android-server.js").isFile) { "Missing android-server.js" }
         check(File(project, "node_modules").isDirectory) { "Missing node_modules" }
         check(File(project, "danmu_api_stable/worker.js").isFile) { "Missing LogVar worker.js" }
+        check(File(project, "config/.env").isFile) { "Missing writable LogVar config/.env" }
     }
 
     private fun makeNativeFilesLoadable(runtime: File) {
