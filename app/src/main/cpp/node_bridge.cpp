@@ -102,6 +102,8 @@ Java_com_example_logvarremote_data_runtime_NativeNodeBridge_startNode(
     set_env("DANMU_API_WORKER", "0");
     set_env("DANMU_API_HOT_RELOAD", "0");
     set_env("TOKEN", auth_token);
+    set_env("ADMIN_TOKEN", auth_token);
+    set_env("DANMU_API_PUBLIC_PROTO", "http");
     set_env("NODE_PATH", project_dir + "/node_modules");
     set_env("HOME", project_dir);
     set_env("TMPDIR", project_dir + "/tmp");
