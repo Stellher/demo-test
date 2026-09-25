@@ -87,19 +87,18 @@ jobs:
           else:
               notes = f"## {tag}\n\nTagged source release.\n"
 
-          notes += """
-### Release assets
-
-All three Android ABIs are first-class and independently packaged:
-
-- arm64-v8a
-- armeabi-v7a
-- x86_64
-
-They use the same Node.js Mobile FULL version, the same Android Bootstrap, the same node_modules pack and the same LogVar Core. Only ABI-specific native Node files differ.
-
-The release also contains the universal APK, common dependency ZIPs, remote-deps-manifest.json and SHA256SUMS.txt.
-"""
+          notes += (
+              "\n### Release assets\n\n"
+              "All three Android ABIs are first-class and independently packaged:\n\n"
+              "- arm64-v8a\n"
+              "- armeabi-v7a\n"
+              "- x86_64\n\n"
+              "They use the same Node.js Mobile FULL version, the same Android Bootstrap, "
+              "the same node_modules pack and the same LogVar Core. "
+              "Only ABI-specific native Node files differ.\n\n"
+              "The release also contains the universal APK, common dependency ZIPs, "
+              "remote-deps-manifest.json and SHA256SUMS.txt.\n"
+          )
           Path("release-notes.md").write_text(notes, encoding="utf-8")
 
       - name: Create/update GitHub Release
