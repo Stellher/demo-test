@@ -6,7 +6,7 @@ Android Studio / Jetpack Compose / MVVM Demo：APK 不内置 Node.js `libnode.so
 
 - 远程下载并校验 Node.js Mobile、LogVar Core、Android bootstrap 与移动端 node_modules。
 - App 内启动 `127.0.0.1:19321` 的 LogVar 主服务与 `19322` 代理端口。
-- Compose **全 API 调试器**：当前目录覆盖 47 个路由操作，包括 Runtime、业务搜索/匹配/弹幕、FongMi/短地址兼容、收藏、本地弹幕 CRUD、日志/请求记录、缓存、环境变量、Cookie、AI、Forward Trace 和 Proxy。
+- Compose **全 API 调试器**：当前目录覆盖 46 个路由操作，包括 Runtime、业务搜索/匹配/弹幕、FongMi/短地址兼容、收藏、本地弹幕 CRUD、日志/请求记录、缓存、环境变量、Cookie、AI、Forward Trace 和 Proxy。
 - App 内 **LogVar 官方本地 Web 面板**：WebView 打开 Core 自带 `danmu_api/ui`，支持 JavaScript、DOM Storage 和文件选择，因此本地弹幕 multipart 上传也可直接操作。
 - 本地 Demo 将 `ADMIN_TOKEN` 与 `TOKEN` 对齐，仅监听 `127.0.0.1`，便于完整调试系统管理接口。
 
