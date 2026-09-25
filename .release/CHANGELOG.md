@@ -1,5 +1,12 @@
 # Version history
 
+## v0.3.2
+- Switched runtime packaging to Node.js Mobile FULL flavor only.
+- Made arm64-v8a the primary Android runtime package.
+- Added complete per-ABI LogVar bundles: each ZIP contains only one native libnode ABI plus Bootstrap, node_modules, LogVar Core, config/.env and tmp.
+- Kept armeabi-v7a and x86_64 as separate compatibility bundles; no cross-ABI native files are mixed into the arm64-v8a package.
+- Added stable-release publishing workflow for per-ABI runtime assets.
+
 ## v0.3.1
 - Added Node.js Mobile full runtime packaging alongside the existing lite runtime.
 - Renamed generated Node packages to explicitly include `lite` or `full`.
