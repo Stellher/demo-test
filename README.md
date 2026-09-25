@@ -130,3 +130,10 @@ Runtime 只监听 localhost。
 - Kotlin / Compose 2.4.0
 
 Release Demo 当前仍使用 debug signing config，正式发布时请替换为自己的 release keystore。
+
+## v0.5.1 Android Web 面板配置
+
+- 环境变量配置支持 JSON 导入与导出。Android WebView 导出通过系统文件保存器（Storage Access Framework）写入 JSON，不依赖 `blob:` 下载。
+- 默认 `SOURCE_ORDER`：`360,vod,tmdb,douban,tencent,youku,iqiyi,imgo,bilibili,renren,hanjutv,dandan,migu`。
+- 默认 `RATE_LIMIT_MAX_REQUESTS=0`，即关闭每 IP 分钟限流。
+- 升级时已有 `.env` 配置会保留，仅给缺失的上述两个变量补默认值。
