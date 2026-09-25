@@ -59,7 +59,7 @@ class LocalPanelActivity : ComponentActivity() {
                 }
             }
 
-            loadUrl(
+            view.loadUrl(
                 "http://127.0.0.1:" + RemoteCatalog.PORT + "/" + RemoteCatalog.TOKEN + "/"
             )
         }
