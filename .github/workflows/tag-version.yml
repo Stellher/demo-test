@@ -1,0 +1,59 @@
+name: Tag source version
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".release/VERSION"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Backfill milestone tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          create_tag() {
+            TAG="$1"
+            SHA="$2"
+            MESSAGE="$3"
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "$TAG already exists"
+            else
+              git tag -a "$TAG" "$SHA" -m "$MESSAGE"
+              git push origin "$TAG"
+            fi
+          }
+
+          create_tag "v0.1.0" "ca9d9e166ab4a8da6b961c5febb95d910863d1f7" "Initial remote Node/LogVar runtime demo"
+          create_tag "v0.2.0" "eaf22973f9319dbbf6c3cd7acca9c9c9d280c4c3" "Full LogVar API debugger and local Web panel"
+          create_tag "v0.2.1" "0f9ba33d73e6f3bb3aaef8bd18b0709be28d8110" "Persist LogVar Web panel environment configuration"
+
+      - name: Tag current version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < .release/VERSION)"
+          test -n "$VERSION"
+          case "$VERSION" in
+            v*) ;;
+            *) echo "VERSION must start with v"; exit 1 ;;
+          esac
+
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "$VERSION already exists"
+          else
+            git tag -a "$VERSION" "$GITHUB_SHA" -m "Source snapshot $VERSION"
+            git push origin "$VERSION"
+          fi
