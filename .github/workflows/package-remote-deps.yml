@@ -1,0 +1,161 @@
+name: Package remote dependencies
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/package-remote-deps.yml"
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pinned upstream dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/bootstrap out
+
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-universal.zip \
+            "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-lite-24.21.0-0.zip"
+
+          echo "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c  work/node-universal.zip" | sha256sum -c -
+
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-modules.zip \
+            "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
+
+          echo "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7  work/node-modules.zip" | sha256sum -c -
+
+          BASE="https://raw.githubusercontent.com/lilixu3/danmu-api-android/4d75ca0420d2946956b34ed8c835b4912870a987/app/src/main/assets/nodejs-project"
+          for name in main.js android-server.js favorite-scheduler-host.js runtime-polyfills.js startup-failure.js worker-proxy.js; do
+            curl -L --fail --retry 5 --retry-delay 2 -o "work/bootstrap/$name" "$BASE/$name"
+          done
+
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/core-source.zip \
+            "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
+
+      - name: Build separate ZIP packages
+        shell: python
+        run: |
+          import hashlib, json, os, shutil, zipfile
+          from pathlib import Path
+
+          work = Path("work")
+          out = Path("out")
+          out.mkdir(exist_ok=True)
+
+          NODE_VERSION = "24.21.0-0"
+          CORE_COMMIT = "280b2327ccf06fb5e32a1db7051025359121a2c1"
+          SHELL_COMMIT = "4d75ca0420d2946956b34ed8c835b4912870a987"
+          ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64")
+
+          # 1) Preserve the exact upstream universal Node archive.
+          shutil.copy2(
+              work / "node-universal.zip",
+              out / f"node-runtime-android-universal-{NODE_VERSION}.zip",
+          )
+
+          # 2) ABI split Node archives: runtime/libnode.so (+ libc++_shared.so if upstream has it).
+          with zipfile.ZipFile(work / "node-universal.zip") as src:
+              names = src.namelist()
+              for abi in ABIS:
+                  chosen = []
+                  for name in names:
+                      normalized = name.replace("\\", "/")
+                      parts = normalized.split("/")
+                      base = parts[-1] if parts else ""
+                      if abi in parts and base in {"libnode.so", "libc++_shared.so"}:
+                          chosen.append((name, base))
+                  if not any(base == "libnode.so" for _, base in chosen):
+                      raise RuntimeError(f"libnode.so not found for {abi}; sample entries={names[:30]}")
+                  target = out / f"node-runtime-{abi}-{NODE_VERSION}.zip"
+                  with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+                      for source_name, base in chosen:
+                          dst.writestr(f"runtime/{base}", src.read(source_name))
+
+          # 3) Android bootstrap, exactly the six runtime JS files required by the demo.
+          bootstrap_target = out / f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip"
+          with zipfile.ZipFile(bootstrap_target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+              for file in sorted((work / "bootstrap").iterdir()):
+                  dst.write(file, file.name)
+
+          # 4) Preserve exact mobile-pruned node_modules pack.
+          shutil.copy2(
+              work / "node-modules.zip",
+              out / "logvar-node-modules-4be12e7971f0.zip",
+          )
+
+          # 5) Minimal LogVar Core. Keep a parent folder before /danmu_api/
+          # so the demo's current extractAfterMarker('/danmu_api/') remains compatible.
+          core_target = out / f"logvar-core-{CORE_COMMIT[:8]}.zip"
+          prefix = f"logvar-core-{CORE_COMMIT[:8]}"
+          count = 0
+          with zipfile.ZipFile(work / "core-source.zip") as src, \
+               zipfile.ZipFile(core_target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+              for info in src.infolist():
+                  normalized = info.filename.replace("\\", "/")
+                  marker = "/danmu_api/"
+                  index = normalized.find(marker)
+                  if index < 0 or info.is_dir():
+                      continue
+                  rel = normalized[index + 1:]  # danmu_api/...
+                  dst.writestr(f"{prefix}/{rel}", src.read(info))
+                  count += 1
+          if count == 0:
+              raise RuntimeError("No danmu_api core files found in codeload archive")
+
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open("rb") as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          descriptions = {
+              f"node-runtime-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android lite upstream archive; contains all supported ABIs.",
+              f"node-runtime-arm64-v8a-{NODE_VERSION}.zip": "Node.js runtime split for arm64-v8a.",
+              f"node-runtime-armeabi-v7a-{NODE_VERSION}.zip": "Node.js runtime split for armeabi-v7a.",
+              f"node-runtime-x86_64-{NODE_VERSION}.zip": "Node.js runtime split for x86_64.",
+              f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip": "Android Node bootstrap JS files used to start LogVar locally.",
+              "logvar-node-modules-4be12e7971f0.zip": "Mobile-pruned production node_modules runtime pack.",
+              f"logvar-core-{CORE_COMMIT[:8]}.zip": "Pinned LogVar danmu_api core only.",
+          }
+
+          packages = []
+          for path in sorted(out.glob("*.zip")):
+              packages.append({
+                  "file": path.name,
+                  "bytes": path.stat().st_size,
+                  "sha256": sha256(path),
+                  "description": descriptions.get(path.name, ""),
+              })
+
+          manifest = {
+              "schemaVersion": 1,
+              "generatedFrom": {
+                  "nodeVersion": NODE_VERSION,
+                  "nodeUniversalSha256": "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c",
+                  "androidBootstrapCommit": SHELL_COMMIT,
+                  "runtimePackSha256": "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7",
+                  "coreCommit": CORE_COMMIT,
+              },
+              "packages": packages,
+          }
+          (out / "remote-deps-manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          for item in packages:
+              print(f'{item["file"]}: {item["bytes"]} bytes  sha256={item["sha256"]}')
+
+      - name: Upload dependency ZIPs
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-dependency-zips
+          path: out/*
+          compression-level: 0
