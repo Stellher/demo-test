@@ -20,6 +20,80 @@ RUNTIME_PACK_SHA256 = os.environ.get(
     "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7",
 )
 ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64")
+DEFAULT_SOURCE_ORDER = "360,vod,tmdb,douban,tencent,youku,iqiyi,imgo,bilibili,renren,hanjutv,dandan,migu"
+DEFAULT_RATE_LIMIT_MAX_REQUESTS = "0"
+DEFAULT_ENV_BYTES = (
+    f"SOURCE_ORDER={DEFAULT_SOURCE_ORDER}\n"
+    f"RATE_LIMIT_MAX_REQUESTS={DEFAULT_RATE_LIMIT_MAX_REQUESTS}\n"
+).encode("utf-8")
+
+
+def patch_core_file(rel: str, data: bytes) -> bytes:
+    if rel not in {"configs/envs.js", "ui/js/systemsettings.js"}:
+        return data
+
+    text = data.decode("utf-8")
+
+    if rel == "configs/envs.js":
+        replacements = {
+            "this.get('SOURCE_ORDER', 'douban,360,renren,hanjutv', 'string')":
+                f"this.get('SOURCE_ORDER', '{DEFAULT_SOURCE_ORDER}', 'string')",
+            "return orderArr.length > 0 ? orderArr : ['douban', '360', 'renren', 'hanjutv'];":
+                "return orderArr.length > 0 ? orderArr : " +
+                str(DEFAULT_SOURCE_ORDER.split(",")).replace('"', "'") + ";",
+            "'RATE_LIMIT_MAX_REQUESTS': { category: 'api', type: 'number', description: '限流配置：1分钟内最大请求次数，0表示不限流，默认3', min: 0, max: 50 }":
+                "'RATE_LIMIT_MAX_REQUESTS': { category: 'api', type: 'number', description: '限流配置：1分钟内最大请求次数，0表示不限流，默认0', min: 0, max: 50 }",
+            "'SOURCE_ORDER': { category: 'source', type: 'multi-select', options: this.ALLOWED_SOURCES, description: '源排序配置，默认douban,360,renren,hanjutv；添加 local 可搜索已上传的本地弹幕，按配置顺序排列搜索结果' }":
+                f"'SOURCE_ORDER': {{ category: 'source', type: 'multi-select', options: this.ALLOWED_SOURCES, description: '源排序配置，默认{DEFAULT_SOURCE_ORDER}；添加 local 可搜索已上传的本地弹幕，按配置顺序排列搜索结果' }}",
+            "this.get('RATE_LIMIT_MAX_REQUESTS', 3, 'number')":
+                "this.get('RATE_LIMIT_MAX_REQUESTS', 0, 'number')",
+            "限流配置：时间窗口内最大请求次数（默认 3，0表示不限流）":
+                "限流配置：时间窗口内最大请求次数（默认 0，0表示不限流）",
+        }
+        for old, new in replacements.items():
+            if old not in text:
+                raise RuntimeError(f"Core patch target not found in envs.js: {old[:80]}")
+            text = text.replace(old, new)
+
+    if rel == "ui/js/systemsettings.js":
+        old = """        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = 'danmu-api-config-' + date + '.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        addLog('配置文件导出成功，共 ' + Object.keys(values).length + ' 项', 'success');"""
+        new = """        const date = new Date().toISOString().slice(0, 10);
+        const fileName = 'danmu-api-config-' + date + '.json';
+        const jsonText = JSON.stringify(exportData, null, 2);
+
+        // Android WebView cannot reliably download blob: URLs. When the native
+        // bridge is available, hand the JSON to Android's Storage Access Framework.
+        if (window.AndroidConfigBridge && typeof window.AndroidConfigBridge.saveConfig === 'function') {
+            window.AndroidConfigBridge.saveConfig(jsonText, fileName);
+            addLog('配置文件已交给 Android 保存，共 ' + Object.keys(values).length + ' 项', 'success');
+            return;
+        }
+
+        const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        addLog('配置文件导出成功，共 ' + Object.keys(values).length + ' 项', 'success');"""
+        if old not in text:
+            raise RuntimeError("Core patch target not found in systemsettings.js exportSystemConfig")
+        text = text.replace(old, new)
+
+    return text.encode("utf-8")
 
 
 def sha256(path: Path) -> str:
@@ -72,7 +146,7 @@ with zipfile.ZipFile(WORK / "core-source.zip") as src:
             continue
         rel = normalized[index + len(marker):]
         if rel:
-            core_entries.append((rel, src.read(info)))
+            core_entries.append((rel, patch_core_file(rel, src.read(info))))
 if not core_entries:
     raise RuntimeError("No danmu_api core files found")
 
@@ -128,7 +202,7 @@ with zipfile.ZipFile(WORK / "node.zip") as node_src:
                 write_bytes(dst, f"project/{name}", data)
             for rel, data in core_entries:
                 write_bytes(dst, f"project/danmu_api_stable/{rel}", data)
-            write_bytes(dst, "project/config/.env", b"")
+            write_bytes(dst, "project/config/.env", DEFAULT_ENV_BYTES)
             write_bytes(dst, "project/tmp/.keep", b"")
 
         packages.append({
@@ -155,6 +229,15 @@ manifest = {
         "runtimePackSha256": RUNTIME_PACK_SHA256,
         "coreCommit": CORE_COMMIT,
         "nodeUpstreamSha256": NODE_UPSTREAM_SHA256,
+        "androidDefaults": {
+            "SOURCE_ORDER": DEFAULT_SOURCE_ORDER,
+            "RATE_LIMIT_MAX_REQUESTS": DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+        },
+        "corePatches": [
+            "Android WebView config export bridge",
+            "SOURCE_ORDER default override",
+            "RATE_LIMIT_MAX_REQUESTS default override",
+        ],
     },
     "common": common,
     "packages": packages,
