@@ -158,20 +158,20 @@ jobs:
           if marker in text:
               section = text.split(marker, 1)[1].split("\n## ", 1)[0].strip()
 
-          notes = f"""## {tag}
-
-{section}
-
-### Backfilled release files
-
-This Release was backfilled after the original development milestone so each source tag has a complete downloadable archive.
-
-- The APK is built from the exact tagged source.
-- Dependency packages use the versions pinned by this project generation: Node.js Mobile 24.21.0-0, Android Bootstrap 4d75ca04, runtime pack 4be12e7971f0 and LogVar Core 280b2327.
-- Native Node packages are separated by arm64-v8a, armeabi-v7a and x86_64.
-- ABI-independent Bootstrap, node_modules and LogVar Core are shared across ABI variants.
-- SHA256SUMS.txt records every uploaded file.
-"""
+          notes = (
+              f"## {tag}\n\n"
+              f"{section}\n\n"
+              "### Backfilled release files\n\n"
+              "This Release was backfilled after the original development milestone so each source tag "
+              "has a complete downloadable archive.\n\n"
+              "- The APK is built from the exact tagged source.\n"
+              "- Dependency packages use the versions pinned by this project generation: "
+              "Node.js Mobile 24.21.0-0, Android Bootstrap 4d75ca04, runtime pack 4be12e7971f0 "
+              "and LogVar Core 280b2327.\n"
+              "- Native Node packages are separated by arm64-v8a, armeabi-v7a and x86_64.\n"
+              "- ABI-independent Bootstrap, node_modules and LogVar Core are shared across ABI variants.\n"
+              "- SHA256SUMS.txt records every uploaded file.\n"
+          )
           Path("historical-release-notes.md").write_text(notes, encoding="utf-8")
 
       - name: Create/update historical GitHub Release
