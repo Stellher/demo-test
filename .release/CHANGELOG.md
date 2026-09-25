@@ -1,5 +1,15 @@
 # Version history
 
+## v0.5.0
+- Unified arm64-v8a, armeabi-v7a and x86_64 as equal first-class runtime targets; no ABI is designated primary.
+- Standardized every ABI on Node.js Mobile FULL 24.21.0-0 plus the same Bootstrap, node_modules and LogVar Core dependency set.
+- Added deterministic per-ABI Node ZIPs and complete LogVar Runtime Bundle ZIPs for all three ABIs.
+- Added separate common Bootstrap, node_modules and LogVar Core assets to every current Release.
+- Moved runtime download URLs to the matching source GitHub Release instead of a separate runtime-only release version.
+- Added automatic Tag Release publishing with APK, dependencies, manifest and SHA256SUMS.
+- Added historical Release backfill for v0.1.0 through v0.4.0.
+- Synced APK versionName/versionCode to 0.5.0 / 5.
+
 ## v0.4.0
 - Switched Android runtime downloads to Node.js Mobile FULL flavor.
 - Made arm64-v8a the primary runtime and removed cross-ABI native payloads from its package.
