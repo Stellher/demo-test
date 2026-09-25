@@ -1,5 +1,13 @@
 # Version history
 
+## v0.4.0
+- Switched Android runtime downloads to Node.js Mobile FULL flavor.
+- Made arm64-v8a the primary runtime and removed cross-ABI native payloads from its package.
+- Added separate FULL bundles for arm64-v8a, armeabi-v7a and x86_64.
+- Each complete bundle contains exactly one native ABI plus Bootstrap, node_modules, LogVar Core, config/.env and tmp.
+- Android now downloads one ABI-specific bundle instead of a universal Node archive plus multiple dependency downloads.
+- Added deterministic ZIP generation and stable GitHub Release assets with fixed SHA-256 values.
+
 ## v0.3.2
 - Switched runtime packaging to Node.js Mobile FULL flavor only.
 - Made arm64-v8a the primary Android runtime package.
