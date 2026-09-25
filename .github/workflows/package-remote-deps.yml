@@ -75,7 +75,7 @@ jobs:
                   target = out / f"node-runtime-{abi}-{NODE_VERSION}.zip"
                   with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
                       for source_name, base in chosen:
-                          dst.writestr(f"runtime/{base}", src.read(source_name))
+                          dst.writestr(f"bin/{abi}/{base}", src.read(source_name))
 
           # 3) Android bootstrap, exactly the six runtime JS files required by the demo.
           bootstrap_target = out / f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip"
