@@ -209,12 +209,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="runtime-full-v24.21.0-0-v0.3.2"
+          TAG="runtime-full-v24.21.0-0-v0.4.0"
           if ! gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --repo "$GH_REPO" \
               --target "$GITHUB_SHA" \
-              --title "Full Node + LogVar runtime v0.3.2" \
+              --title "Full Node + LogVar runtime v0.4.0" \
               --notes "Per-ABI FULL Node.js Mobile runtime bundles. arm64-v8a is the primary Android package; armeabi-v7a and x86_64 are separate compatibility assets."
           fi
           gh release upload "$TAG" out/* --repo "$GH_REPO" --clobber
