@@ -14,6 +14,11 @@ class NodeRuntimeManager(context: Context) {
     suspend fun start(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             check(paths.isInstalled()) { "Runtime is not installed" }
+
+            // LogVar NodeHandler saves Web-panel environment variables here.
+            // Older demo installs only created config/, so ensure .env exists before Node starts.
+            paths.ensureRuntimeConfigFile()
+
             check(starting.compareAndSet(false, true)) { "Node is already running/starting in this app process" }
 
             val libcxx = paths.libcxxLib.takeIf { it.isFile }?.absolutePath
