@@ -22,7 +22,7 @@ class RuntimePaths(context: Context) {
     val libcxxLib = File(runtimeDir, "libc++_shared.so")
     val mainJs = File(projectDir, "main.js")
     val coreDir = File(projectDir, "danmu_api_stable")
-    val installedMarker = File(root, ".installed-v4-full-bundle")
+    val installedMarker = File(root, ".installed-v5-env-export")
 
     fun isInstalled(): Boolean =
         nodeLib.isFile && mainJs.isFile && File(coreDir, "worker.js").isFile && installedMarker.isFile
