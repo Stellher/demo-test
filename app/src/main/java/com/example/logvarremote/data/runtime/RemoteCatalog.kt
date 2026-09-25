@@ -9,7 +9,7 @@ object RemoteCatalog {
         "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"
     const val CORE_COMMIT = "280b2327ccf06fb5e32a1db7051025359121a2c1"
 
-    private const val RELEASE_TAG = "v0.5.0"
+    private const val RELEASE_TAG = "v0.5.1"
     private const val RELEASE_BASE =
         "https://github.com/Stellher/demo-test/releases/download/$RELEASE_TAG"
 
@@ -23,17 +23,17 @@ object RemoteCatalog {
         "arm64-v8a" to RuntimeBundle(
             abi = "arm64-v8a",
             url = "$RELEASE_BASE/logvar-runtime-full-arm64-v8a-$NODE_VERSION.zip",
-            sha256 = "f8bbde8c2672ede62c558749751f267f63fa984605771ee6079564b61daf65df"
+            sha256 = "db65811035a0af4af9d5f09678756393ee8e468592813caea7ffdd8577575a90"
         ),
         "armeabi-v7a" to RuntimeBundle(
             abi = "armeabi-v7a",
             url = "$RELEASE_BASE/logvar-runtime-full-armeabi-v7a-$NODE_VERSION.zip",
-            sha256 = "f2c7c35e5c7b9a152350f0b714753a3f0caca26eea50d502b53fe0b264f4f15b"
+            sha256 = "2d581b3525acd267e47836d64bd83a4095febff909050f75648f00a87374cda2"
         ),
         "x86_64" to RuntimeBundle(
             abi = "x86_64",
             url = "$RELEASE_BASE/logvar-runtime-full-x86_64-$NODE_VERSION.zip",
-            sha256 = "6c43d4a6c0218c8fbb59e299cdb84dc116819fd04a203fc75b6d1ec0e9fd4cd1"
+            sha256 = "1027877089e6dec7fdef968e4b7d9115c6f5c260d702cbd0993ea84b0356763f"
         )
     )
 
