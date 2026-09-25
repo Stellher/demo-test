@@ -1,5 +1,11 @@
 # Version history
 
+## v0.3.1
+- Added Node.js Mobile full runtime packaging alongside the existing lite runtime.
+- Renamed generated Node packages to explicitly include `lite` or `full`.
+- Added universal and per-ABI full runtime ZIPs.
+- Added full-runtime upstream SHA-256 to the generated manifest.
+
 ## v0.3.0
 - Added reproducible remote dependency ZIP packaging workflow.
 - Split Node.js Mobile runtime into arm64-v8a, armeabi-v7a and x86_64 ZIPs.
