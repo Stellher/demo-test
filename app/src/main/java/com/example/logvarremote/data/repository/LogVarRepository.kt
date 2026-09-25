@@ -1,6 +1,9 @@
 package com.example.logvarremote.data.repository
 
 import android.content.Context
+import com.example.logvarremote.data.api.ApiDebugClient
+import com.example.logvarremote.data.api.ApiDebugResult
+import com.example.logvarremote.data.api.ApiEndpoint
 import com.example.logvarremote.data.api.LogVarLocalClient
 import com.example.logvarremote.data.runtime.NodeRuntimeManager
 import com.example.logvarremote.data.runtime.RemoteCatalog
@@ -14,6 +17,7 @@ class LogVarRepository(context: Context) {
     private val installer = RuntimeInstaller(appContext)
     private val runtimeManager = NodeRuntimeManager(appContext)
     private val api = LogVarLocalClient()
+    private val debugApi = ApiDebugClient()
 
     fun isInstalled(): Boolean = installer.isInstalled()
 
@@ -38,4 +42,13 @@ class LogVarRepository(context: Context) {
         withContext(Dispatchers.IO) {
             runCatching { api.searchEpisode(anime, episode) }
         }
+
+    suspend fun executeDebug(
+        endpoint: ApiEndpoint,
+        path: String,
+        query: String,
+        body: String
+    ): Result<ApiDebugResult> = withContext(Dispatchers.IO) {
+        runCatching { debugApi.execute(endpoint, path, query, body) }
+    }
 }
