@@ -17,12 +17,7 @@ jobs:
           set -euo pipefail
           mkdir -p work/bootstrap out
 
-          curl -L --fail --retry 5 --retry-delay 2 \
-            -o work/node-universal.zip \
-            "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-lite-24.21.0-0.zip"
-
-          echo "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c  work/node-universal.zip" | sha256sum -c -
-
+          # Node.js Mobile FULL flavor only.
           curl -L --fail --retry 5 --retry-delay 2 \
             -o work/node-full-universal.zip \
             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
@@ -44,10 +39,10 @@ jobs:
             -o work/core-source.zip \
             "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
 
-      - name: Build separate ZIP packages
+      - name: Build per-ABI full runtime packages
         shell: python
         run: |
-          import hashlib, json, os, shutil, zipfile
+          import hashlib, json, shutil, zipfile
           from pathlib import Path
 
           work = Path("work")
@@ -59,64 +54,6 @@ jobs:
           SHELL_COMMIT = "4d75ca0420d2946956b34ed8c835b4912870a987"
           ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64")
 
-          def package_node_flavor(source_zip: Path, flavor: str):
-              universal_name = f"node-runtime-{flavor}-android-universal-{NODE_VERSION}.zip"
-              shutil.copy2(source_zip, out / universal_name)
-
-              with zipfile.ZipFile(source_zip) as src:
-                  names = src.namelist()
-                  for abi in ABIS:
-                      chosen = []
-                      for name in names:
-                          normalized = name.replace("\\", "/")
-                          parts = normalized.split("/")
-                          base = parts[-1] if parts else ""
-                          if abi in parts and base in {"libnode.so", "libc++_shared.so"}:
-                              chosen.append((name, base))
-                      if not any(base == "libnode.so" for _, base in chosen):
-                          raise RuntimeError(f"libnode.so not found for {flavor}/{abi}")
-                      target = out / f"node-runtime-{flavor}-{abi}-{NODE_VERSION}.zip"
-                      with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
-                          for source_name, base in chosen:
-                              dst.writestr(f"bin/{abi}/{base}", src.read(source_name))
-
-          # 1) Node.js Mobile lite: current demo runtime.
-          package_node_flavor(work / "node-universal.zip", "lite")
-
-          # 2) Node.js Mobile full: general-purpose runtime with the full feature set.
-          package_node_flavor(work / "node-full-universal.zip", "full")
-
-          # 3) Android bootstrap, exactly the six runtime JS files required by the demo.
-          bootstrap_target = out / f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip"
-          with zipfile.ZipFile(bootstrap_target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
-              for file in sorted((work / "bootstrap").iterdir()):
-                  dst.write(file, file.name)
-
-          # 4) Preserve exact mobile-pruned node_modules pack.
-          shutil.copy2(
-              work / "node-modules.zip",
-              out / "logvar-node-modules-4be12e7971f0.zip",
-          )
-
-          # 5) Minimal LogVar Core. Keep a parent folder before /danmu_api/
-          # so the demo's current extractAfterMarker('/danmu_api/') remains compatible.
-          core_target = out / f"logvar-core-{CORE_COMMIT[:8]}.zip"
-          prefix = f"logvar-core-{CORE_COMMIT[:8]}"
-          count = 0
-          with zipfile.ZipFile(work / "core-source.zip") as src, \
-               zipfile.ZipFile(core_target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
-              for info in src.infolist():
-                  normalized = info.filename.replace("\\", "/")
-                  marker = "/danmu_api/"
-                  index = normalized.find(marker)
-                  if index < 0 or info.is_dir():
-                      continue
-                  rel = normalized[index + 1:]  # danmu_api/...
-                  dst.writestr(f"{prefix}/{rel}", src.read(info))
-                  count += 1
-          if count == 0:
-              raise RuntimeError("No danmu_api core files found in codeload archive")
-
           def sha256(path: Path) -> str:
               h = hashlib.sha256()
               with path.open("rb") as f:
@@ -124,48 +61,130 @@ jobs:
                       h.update(chunk)
               return h.hexdigest()
 
-          descriptions = {
-              f"node-runtime-lite-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android lite upstream archive; contains all supported ABIs.",
-              f"node-runtime-lite-arm64-v8a-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for arm64-v8a.",
-              f"node-runtime-lite-armeabi-v7a-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for armeabi-v7a.",
-              f"node-runtime-lite-x86_64-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for x86_64.",
-              f"node-runtime-full-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android full upstream archive; contains all supported ABIs.",
-              f"node-runtime-full-arm64-v8a-{NODE_VERSION}.zip": "Node.js Mobile full runtime for arm64-v8a.",
-              f"node-runtime-full-armeabi-v7a-{NODE_VERSION}.zip": "Node.js Mobile full runtime for armeabi-v7a.",
-              f"node-runtime-full-x86_64-{NODE_VERSION}.zip": "Node.js Mobile full runtime for x86_64.",
-              f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip": "Android Node bootstrap JS files used to start LogVar locally.",
-              "logvar-node-modules-4be12e7971f0.zip": "Mobile-pruned production node_modules runtime pack.",
-              f"logvar-core-{CORE_COMMIT[:8]}.zip": "Pinned LogVar danmu_api core only.",
+          def find_native_entries(src, abi):
+              chosen = []
+              for name in src.namelist():
+                  normalized = name.replace("\\", "/")
+                  parts = normalized.split("/")
+                  base = parts[-1] if parts else ""
+                  if abi in parts and base in {"libnode.so", "libc++_shared.so"}:
+                      chosen.append((name, base))
+              if not any(base == "libnode.so" for _, base in chosen):
+                  raise RuntimeError(f"libnode.so not found for {abi}")
+              return chosen
+
+          # Preload common JS/runtime data. These are architecture-independent.
+          bootstrap_files = {
+              p.name: p.read_bytes()
+              for p in sorted((work / "bootstrap").iterdir())
+              if p.is_file()
           }
 
+          node_modules_entries = []
+          with zipfile.ZipFile(work / "node-modules.zip") as src:
+              for info in src.infolist():
+                  if info.is_dir():
+                      continue
+                  node_modules_entries.append((info.filename, src.read(info)))
+
+          core_entries = []
+          with zipfile.ZipFile(work / "core-source.zip") as src:
+              for info in src.infolist():
+                  normalized = info.filename.replace("\\", "/")
+                  marker = "/danmu_api/"
+                  index = normalized.find(marker)
+                  if index < 0 or info.is_dir():
+                      continue
+                  rel = normalized[index + len(marker):]
+                  if rel:
+                      core_entries.append((rel, src.read(info)))
+          if not core_entries:
+              raise RuntimeError("No danmu_api core files found")
+
           packages = []
-          for path in sorted(out.glob("*.zip")):
-              packages.append({
-                  "file": path.name,
-                  "bytes": path.stat().st_size,
-                  "sha256": sha256(path),
-                  "description": descriptions.get(path.name, ""),
-              })
+
+          with zipfile.ZipFile(work / "node-full-universal.zip") as node_src:
+              for abi in ABIS:
+                  native_entries = find_native_entries(node_src, abi)
+
+                  # A. Standalone FULL Node runtime for this ABI only.
+                  node_zip = out / f"node-runtime-full-{abi}-{NODE_VERSION}.zip"
+                  with zipfile.ZipFile(node_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+                      for source_name, base in native_entries:
+                          dst.writestr(f"bin/{abi}/{base}", node_src.read(source_name))
+
+                  # B. Complete LogVar runtime bundle for this ABI only.
+                  # Layout matches Android RuntimePaths after extraction:
+                  # runtime/libnode.so
+                  # project/main.js
+                  # project/node_modules/...
+                  # project/danmu_api_stable/...
+                  bundle = out / f"logvar-runtime-full-{abi}-{NODE_VERSION}.zip"
+                  with zipfile.ZipFile(bundle, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+                      for source_name, base in native_entries:
+                          dst.writestr(f"runtime/{base}", node_src.read(source_name))
+
+                      for name, data in bootstrap_files.items():
+                          dst.writestr(f"project/{name}", data)
+
+                      for name, data in node_modules_entries:
+                          normalized = name.replace("\\", "/").lstrip("/")
+                          dst.writestr(f"project/{normalized}", data)
+
+                      for rel, data in core_entries:
+                          dst.writestr(f"project/danmu_api_stable/{rel}", data)
+
+                      # Required writable runtime paths. Empty .env fixes Web-panel saves.
+                      dst.writestr("project/config/.env", b"")
+                      dst.writestr("project/tmp/.keep", b"")
+
+                  packages.extend([
+                      {
+                          "file": node_zip.name,
+                          "abi": abi,
+                          "type": "node-full",
+                          "bytes": node_zip.stat().st_size,
+                          "sha256": sha256(node_zip),
+                      },
+                      {
+                          "file": bundle.name,
+                          "abi": abi,
+                          "type": "logvar-full-bundle",
+                          "bytes": bundle.stat().st_size,
+                          "sha256": sha256(bundle),
+                      },
+                  ])
 
           manifest = {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
+              "primaryAbi": "arm64-v8a",
+              "nodeFlavor": "full",
               "generatedFrom": {
                   "nodeVersion": NODE_VERSION,
-                  "nodeLiteUniversalSha256": "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c",
                   "nodeFullUniversalSha256": "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76",
                   "androidBootstrapCommit": SHELL_COMMIT,
                   "runtimePackSha256": "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7",
                   "coreCommit": CORE_COMMIT,
               },
+              "notes": {
+                  "bootstrap": "JavaScript; ABI-independent",
+                  "nodeModules": "JavaScript dependencies; ABI-independent in this pruned pack",
+                  "core": "JavaScript; ABI-independent",
+                  "nativeAbiBoundary": "Only Node native runtime differs per ABI",
+              },
               "packages": packages,
           }
+
           (out / "remote-deps-manifest.json").write_text(
               json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8",
           )
 
           for item in packages:
-              print(f'{item["file"]}: {item["bytes"]} bytes  sha256={item["sha256"]}')
+              print(
+                  f'{item["file"]}: {item["bytes"]} bytes '
+                  f'abi={item["abi"]} type={item["type"]} sha256={item["sha256"]}'
+              )
 
       - name: Upload dependency ZIPs
         uses: actions/upload-artifact@v4
