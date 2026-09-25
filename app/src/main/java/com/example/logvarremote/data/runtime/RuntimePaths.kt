@@ -9,6 +9,8 @@ class RuntimePaths(context: Context) {
     val runtimeDir = File(root, "runtime")
     val projectDir = File(root, "project")
     val downloadDir = File(root, "downloads")
+    val configDir = File(projectDir, "config")
+    val envFile = File(configDir, ".env")
 
     val nodeLib = File(runtimeDir, "libnode.so")
     val libcxxLib = File(runtimeDir, "libc++_shared.so")
@@ -25,5 +27,16 @@ class RuntimePaths(context: Context) {
         projectDir.mkdirs()
         downloadDir.mkdirs()
         File(projectDir, "tmp").mkdirs()
+        configDir.mkdirs()
+    }
+
+    fun ensureRuntimeConfigFile() {
+        configDir.mkdirs()
+        if (!envFile.exists()) {
+            envFile.writeText("")
+        }
+        check(envFile.isFile && envFile.canWrite()) {
+            "Runtime config is not writable: ${envFile.absolutePath}"
+        }
     }
 }
