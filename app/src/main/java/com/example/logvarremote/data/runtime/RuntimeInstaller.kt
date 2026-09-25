@@ -49,6 +49,7 @@ class RuntimeInstaller(
         } else if (!stagingEnvFile.exists()) {
             stagingEnvFile.writeText("")
         }
+        paths.ensureRuntimeConfigDefaults(stagingEnvFile)
 
         File(projectStaging, "tmp").mkdirs()
 
