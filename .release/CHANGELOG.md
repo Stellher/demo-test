@@ -1,5 +1,14 @@
 # Version history
 
+## v0.5.1
+- Fixed environment configuration export inside the Android WebView by bridging JSON export to Android's Storage Access Framework.
+- SOURCE_ORDER default is now: 360,vod,tmdb,douban,tencent,youku,iqiyi,imgo,bilibili,renren,hanjutv,dandan,migu.
+- RATE_LIMIT_MAX_REQUESTS now defaults to 0 (unlimited).
+- Existing .env values are preserved; only missing SOURCE_ORDER / RATE_LIMIT_MAX_REQUESTS keys receive the new defaults.
+- Patched LogVar Core runtime fallback values and Web-panel descriptions to match the Android defaults.
+- Rebuilt arm64-v8a, armeabi-v7a and x86_64 FULL runtime bundles from the same patched dependency set.
+- Runtime marker was advanced so upgrading from v0.5.0 performs one controlled runtime refresh while preserving the user's .env.
+
 ## v0.5.0
 - Unified arm64-v8a, armeabi-v7a and x86_64 as equal first-class runtime targets; no ABI is designated primary.
 - Standardized every ABI on Node.js Mobile FULL 24.21.0-0 plus the same Bootstrap, node_modules and LogVar Core dependency set.
