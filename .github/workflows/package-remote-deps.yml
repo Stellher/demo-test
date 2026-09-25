@@ -24,6 +24,12 @@ jobs:
           echo "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c  work/node-universal.zip" | sha256sum -c -
 
           curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-full-universal.zip \
+            "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+
+          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node-full-universal.zip" | sha256sum -c -
+
+          curl -L --fail --retry 5 --retry-delay 2 \
             -o work/node-modules.zip \
             "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
 
@@ -53,29 +59,32 @@ jobs:
           SHELL_COMMIT = "4d75ca0420d2946956b34ed8c835b4912870a987"
           ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64")
 
-          # 1) Preserve the exact upstream universal Node archive.
-          shutil.copy2(
-              work / "node-universal.zip",
-              out / f"node-runtime-android-universal-{NODE_VERSION}.zip",
-          )
+          def package_node_flavor(source_zip: Path, flavor: str):
+              universal_name = f"node-runtime-{flavor}-android-universal-{NODE_VERSION}.zip"
+              shutil.copy2(source_zip, out / universal_name)
 
-          # 2) ABI split Node archives: runtime/libnode.so (+ libc++_shared.so if upstream has it).
-          with zipfile.ZipFile(work / "node-universal.zip") as src:
-              names = src.namelist()
-              for abi in ABIS:
-                  chosen = []
-                  for name in names:
-                      normalized = name.replace("\\", "/")
-                      parts = normalized.split("/")
-                      base = parts[-1] if parts else ""
-                      if abi in parts and base in {"libnode.so", "libc++_shared.so"}:
-                          chosen.append((name, base))
-                  if not any(base == "libnode.so" for _, base in chosen):
-                      raise RuntimeError(f"libnode.so not found for {abi}; sample entries={names[:30]}")
-                  target = out / f"node-runtime-{abi}-{NODE_VERSION}.zip"
-                  with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
-                      for source_name, base in chosen:
-                          dst.writestr(f"bin/{abi}/{base}", src.read(source_name))
+              with zipfile.ZipFile(source_zip) as src:
+                  names = src.namelist()
+                  for abi in ABIS:
+                      chosen = []
+                      for name in names:
+                          normalized = name.replace("\\", "/")
+                          parts = normalized.split("/")
+                          base = parts[-1] if parts else ""
+                          if abi in parts and base in {"libnode.so", "libc++_shared.so"}:
+                              chosen.append((name, base))
+                      if not any(base == "libnode.so" for _, base in chosen):
+                          raise RuntimeError(f"libnode.so not found for {flavor}/{abi}")
+                      target = out / f"node-runtime-{flavor}-{abi}-{NODE_VERSION}.zip"
+                      with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
+                          for source_name, base in chosen:
+                              dst.writestr(f"bin/{abi}/{base}", src.read(source_name))
+
+          # 1) Node.js Mobile lite: current demo runtime.
+          package_node_flavor(work / "node-universal.zip", "lite")
+
+          # 2) Node.js Mobile full: general-purpose runtime with the full feature set.
+          package_node_flavor(work / "node-full-universal.zip", "full")
 
           # 3) Android bootstrap, exactly the six runtime JS files required by the demo.
           bootstrap_target = out / f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip"
@@ -116,10 +125,14 @@ jobs:
               return h.hexdigest()
 
           descriptions = {
-              f"node-runtime-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android lite upstream archive; contains all supported ABIs.",
-              f"node-runtime-arm64-v8a-{NODE_VERSION}.zip": "Node.js runtime split for arm64-v8a.",
-              f"node-runtime-armeabi-v7a-{NODE_VERSION}.zip": "Node.js runtime split for armeabi-v7a.",
-              f"node-runtime-x86_64-{NODE_VERSION}.zip": "Node.js runtime split for x86_64.",
+              f"node-runtime-lite-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android lite upstream archive; contains all supported ABIs.",
+              f"node-runtime-lite-arm64-v8a-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for arm64-v8a.",
+              f"node-runtime-lite-armeabi-v7a-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for armeabi-v7a.",
+              f"node-runtime-lite-x86_64-{NODE_VERSION}.zip": "Node.js Mobile lite runtime for x86_64.",
+              f"node-runtime-full-android-universal-{NODE_VERSION}.zip": "Node.js Mobile Android full upstream archive; contains all supported ABIs.",
+              f"node-runtime-full-arm64-v8a-{NODE_VERSION}.zip": "Node.js Mobile full runtime for arm64-v8a.",
+              f"node-runtime-full-armeabi-v7a-{NODE_VERSION}.zip": "Node.js Mobile full runtime for armeabi-v7a.",
+              f"node-runtime-full-x86_64-{NODE_VERSION}.zip": "Node.js Mobile full runtime for x86_64.",
               f"logvar-android-bootstrap-{SHELL_COMMIT[:8]}.zip": "Android Node bootstrap JS files used to start LogVar locally.",
               "logvar-node-modules-4be12e7971f0.zip": "Mobile-pruned production node_modules runtime pack.",
               f"logvar-core-{CORE_COMMIT[:8]}.zip": "Pinned LogVar danmu_api core only.",
@@ -138,7 +151,8 @@ jobs:
               "schemaVersion": 1,
               "generatedFrom": {
                   "nodeVersion": NODE_VERSION,
-                  "nodeUniversalSha256": "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c",
+                  "nodeLiteUniversalSha256": "1424d88050fcf1e114afc2408aa504dc9ce6043e86605bc3ce0b2cd3f9d04d9c",
+                  "nodeFullUniversalSha256": "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76",
                   "androidBootstrapCommit": SHELL_COMMIT,
                   "runtimePackSha256": "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7",
                   "coreCommit": CORE_COMMIT,
