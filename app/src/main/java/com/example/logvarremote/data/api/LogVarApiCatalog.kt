@@ -2,18 +2,13 @@ package com.example.logvarremote.data.api
 
 object LogVarApiCatalog {
     val endpoints = listOf(
-        ApiEndpoint("health", "Runtime", "运行状态", ApiHttpMethod.GET, "/__health", tokenRequired = false, description = "Android Node Runtime 健康检查"),
-        ApiEndpoint("shutdown", "Runtime", "关闭 Node", ApiHttpMethod.POST, "/__shutdown", description = "优雅关闭本地 Node 进程"),
-        ApiEndpoint("accessGet", "Runtime", "访问控制状态", ApiHttpMethod.GET, "/__access-control"),
-        ApiEndpoint("accessPatch", "Runtime", "修改访问控制", ApiHttpMethod.PATCH, "/__access-control", defaultBody = """{"mode":"off"}"""),
-        ApiEndpoint("prepare", "Runtime", "预取弹幕 XML", ApiHttpMethod.GET, "/__danmaku/prepare", defaultQuery = "url=https%3A%2F%2Fexample.com%2Fvideo"),
-        ApiEndpoint("prepared", "Runtime", "读取预取 XML", ApiHttpMethod.GET, "/__danmaku/prepared/{id}.xml", description = "把 {id} 替换为 prepare 返回的 id"),
+        ApiEndpoint("root", "Runtime", "LogVar 面板首页", ApiHttpMethod.GET, "/", tokenRequired = false, description = "原版 LogVar Node 服务根页面"),
 
         ApiEndpoint("searchAnime", "业务", "搜索动漫/影视", ApiHttpMethod.GET, "/api/v2/search/anime", "keyword=凡人修仙传"),
         ApiEndpoint("searchEpisodes", "业务", "搜索指定集", ApiHttpMethod.GET, "/api/v2/search/episodes", "anime=凡人修仙传&episode=1"),
         ApiEndpoint("match", "业务", "文件名匹配", ApiHttpMethod.POST, "/api/v2/match", defaultBody = """{"fileName":"凡人修仙传 S01E01"}"""),
         ApiEndpoint("bangumi", "业务", "番剧详情", ApiHttpMethod.GET, "/api/v2/bangumi/{animeId}", description = "把 {animeId} 替换为搜索返回 ID"),
-        ApiEndpoint("commentId", "业务", "按 commentId 获取弹幕", ApiHttpMethod.GET, "/api/v2/comment/{commentId}", "format=json&duration=true", description = "支持 format、duration、segmentflag；Android Runtime 额外支持 offset/offsetMs/fontSize"),
+        ApiEndpoint("commentId", "业务", "按 commentId 获取弹幕", ApiHttpMethod.GET, "/api/v2/comment/{commentId}", "format=json&duration=true", description = "支持上游 format、duration、segmentflag 等参数"),
         ApiEndpoint("commentUrl", "业务", "按播放 URL 获取弹幕", ApiHttpMethod.GET, "/api/v2/comment", "url=https%3A%2F%2Fexample.com%2Fvideo&format=json"),
         ApiEndpoint("extComment", "业务", "扩展 URL 弹幕", ApiHttpMethod.GET, "/api/v2/extcomment", "url=https%3A%2F%2Fexample.com%2Fvideo&format=json"),
         ApiEndpoint("segmentComment", "业务", "分片弹幕", ApiHttpMethod.POST, "/api/v2/segmentcomment", "format=json", """{"url":"https://example.com/video","format":"json"}"""),
