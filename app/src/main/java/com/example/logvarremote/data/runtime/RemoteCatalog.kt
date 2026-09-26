@@ -4,12 +4,12 @@ object RemoteCatalog {
     const val NODE_VERSION = "24.21.0-0"
     const val NODE_FLAVOR = "full"
 
-    const val LOGVAR_REPOSITORY = "lilixu3/danmu_api"
-    const val LOGVAR_COMMIT = "280b2327ccf06fb5e32a1db7051025359121a2c1"
-    const val LOGVAR_SHORT_COMMIT = "280b2327ccf0"
+    const val LOGVAR_REPOSITORY = "huangxd-/danmu_api"
+    const val LOGVAR_COMMIT = "fc1b7ff6add61d8af24c9bf978253273833f5afc"
+    const val LOGVAR_SHORT_COMMIT = "fc1b7ff6add6"
     const val LOGVAR_DEPENDENCY_MODE = "per-abi"
 
-    private const val RELEASE_TAG = "v0.6.0"
+    private const val RELEASE_TAG = "v0.6.1"
     private const val RELEASE_BASE =
         "https://github.com/Stellher/demo-test/releases/download/$RELEASE_TAG"
 
@@ -41,17 +41,17 @@ object RemoteCatalog {
         "arm64-v8a" to RuntimeArtifact(
             fileName = "logvar-runtime-arm64-v8a-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-arm64-v8a-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "2425a8f767ad9ea2216f7ea98e77602deb87dadb59003f767c87373f2fe4656a"
+            sha256 = "9257d3d4849a6be50f54bff02dbb08dbfd68de47601eac2b07ee0788ecf69be5"
         ),
         "armeabi-v7a" to RuntimeArtifact(
             fileName = "logvar-runtime-armeabi-v7a-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-armeabi-v7a-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "4a23b49231123fb3af627023cc43b2c4121b181cb3f17087a5b658a9162d2241"
+            sha256 = "6bde512786b1832aa40486ce63b6e9128cf3ab3f91a4c09f49f87cf9df1d7a5c"
         ),
         "x86_64" to RuntimeArtifact(
             fileName = "logvar-runtime-x86_64-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-x86_64-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "196aea9fd0b73296e6f788145fa3ad6a317c6c6258ec6fa9286dbbb003089796"
+            sha256 = "0318d4195c9b67d007ca48628fae97044813b0dd2870e4f2ff2a07603ac001d1"
         )
     )
 
