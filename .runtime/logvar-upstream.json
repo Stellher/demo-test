@@ -4,5 +4,6 @@
   "commit": "fc1b7ff6add61d8af24c9bf978253273833f5afc",
   "policy": "stable-pinned",
   "sourceModification": "none",
-  "dependencyLockPolicy": "per-abi-committed"
+  "dependencyLockPolicy": "per-abi-committed",
+  "dependencyLockCommit": "01f9b043f640d9b0ef9a00fd92430e8af05c2bdc"
 }
