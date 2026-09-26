@@ -60,18 +60,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p out
 
           build_deps() {
             ABI="$1"
             CPU="$2"
             TARGET="work/logvar-$ABI"
+
             rm -rf "$TARGET"
             mkdir -p "$TARGET"
             cp work/logvar-source/package.json "$TARGET/package.json"
+
             (
               cd "$TARGET"
-              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=false                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
+              npm install \
+                --omit=dev \
+                --ignore-scripts \
+                --package-lock=true \
+                --no-audit \
+                --no-fund \
+                --os=android \
+                --cpu="$CPU"
             )
+
+            cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
           }
 
           build_deps arm64-v8a arm64
@@ -92,7 +104,6 @@ jobs:
           LOGVAR_REPOSITORY: ${{ steps.meta.outputs.repository }}
           LOGVAR_COMMIT: ${{ steps.meta.outputs.sha }}
         run: |
-          mkdir -p out
           python3 .github/scripts/package_logvar_runtime.py
           cd out
           sha256sum *.zip *.json > SHA256SUMS.txt
@@ -115,9 +126,16 @@ jobs:
           - Upstream commit: $UPSTREAM_SHA
           - Source modification: none
           - node_modules: resolved independently for arm64-v8a, armeabi-v7a and x86_64
+          - Per-ABI dependency lock files are included with the candidate
           - Packaging mode is recorded in logvar-runtime-manifest.json
 
           This is a prerelease candidate. Promoting it to the server stable channel is a separate decision.
           EOF
 
-          gh release create "$RELEASE_TAG"             --repo "$GH_REPO"             --target "$GITHUB_SHA"             --title "LogVar upstream candidate ${UPSTREAM_SHA:0:12}"             --notes-file release-notes.md             --prerelease             out/*
+          gh release create "$RELEASE_TAG" \
+            --repo "$GH_REPO" \
+            --target "$GITHUB_SHA" \
+            --title "LogVar upstream candidate ${UPSTREAM_SHA:0:12}" \
+            --notes-file release-notes.md \
+            --prerelease \
+            out/*
