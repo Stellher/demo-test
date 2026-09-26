@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - ".runtime/logvar-upstream.json"
+      - ".runtime/locks/**"
       - ".github/workflows/package-remote-deps.yml"
       - ".github/scripts/package_node_runtime.py"
       - ".github/scripts/package_logvar_runtime.py"
@@ -26,9 +27,11 @@ jobs:
           from pathlib import Path
 
           data = json.loads(Path(".runtime/logvar-upstream.json").read_text(encoding="utf-8"))
+          commit = data["commit"]
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("repository=" + data["repository"] + "\n")
-              f.write("commit=" + data["commit"] + "\n")
+              f.write("commit=" + commit + "\n")
+              f.write("short=" + commit[:12] + "\n")
 
       - name: Checkout exact unmodified LogVar source
         uses: actions/checkout@v4
@@ -47,7 +50,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p work out
-          curl -L --fail --retry 5 --retry-delay 2             -o work/node-full.zip             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-full.zip \
+            "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
           echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node-full.zip" | sha256sum -c -
 
       - name: Package per-ABI Node Runtime
@@ -66,14 +71,41 @@ jobs:
             ABI="$1"
             CPU="$2"
             TARGET="work/logvar-$ABI"
+            LOCK=".runtime/locks/${{ steps.logvar.outputs.short }}/$ABI-package-lock.json"
+
             rm -rf "$TARGET"
             mkdir -p "$TARGET"
             cp work/logvar-source/package.json "$TARGET/package.json"
 
-            (
-              cd "$TARGET"
-              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=false                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
-            )
+            if [ -f "$LOCK" ]; then
+              echo "Using committed dependency lock: $LOCK"
+              cp "$LOCK" "$TARGET/package-lock.json"
+              (
+                cd "$TARGET"
+                npm ci \
+                  --omit=dev \
+                  --ignore-scripts \
+                  --no-audit \
+                  --no-fund \
+                  --os=android \
+                  --cpu="$CPU"
+              )
+            else
+              echo "No committed lock for $ABI; resolving dependency graph"
+              (
+                cd "$TARGET"
+                npm install \
+                  --omit=dev \
+                  --ignore-scripts \
+                  --package-lock=true \
+                  --no-audit \
+                  --no-fund \
+                  --os=android \
+                  --cpu="$CPU"
+              )
+            fi
+
+            cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
           }
 
           build_deps arm64-v8a arm64
@@ -109,8 +141,9 @@ jobs:
               "invariants": [
                   "Node Runtime is always packaged per Android ABI.",
                   "LogVar upstream source files are never modified.",
-                  "LogVar Runtime contains upstream source plus the node_modules resolved from its package.json.",
-                  "LogVar is universal only when all three dependency trees are byte-identical and contain no native binaries.",
+                  "LogVar Runtime contains upstream source plus node_modules resolved from the upstream package.json.",
+                  "Committed dependency locks live outside the upstream source tree.",
+                  "LogVar is universal only when all ABI dependency trees are byte-identical and contain no native binaries.",
                   "Otherwise LogVar is published separately per ABI."
               ]
           }
