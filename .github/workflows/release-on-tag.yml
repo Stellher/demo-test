@@ -4,13 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_run:
-    workflows:
-      - "Tag source version"
-    types:
-      - completed
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -18,37 +11,66 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source release
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
       - name: Resolve source version
         id: meta
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --tags --force
+
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG="$GITHUB_REF_NAME"
           else
             TAG="$(tr -d '[:space:]' < .release/VERSION)"
+            git checkout "$TAG"
           fi
-          test -n "$TAG"
-          git fetch --tags --force
+
           git rev-parse "$TAG" >/dev/null
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "sha=$(git rev-list -n 1 "$TAG")" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pinned LogVar upstream
+        id: logvar
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(".runtime/logvar-upstream.json").read_text(encoding="utf-8"))
+          commit = data["commit"]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("repository=" + data["repository"] + "\n")
+              f.write("commit=" + commit + "\n")
+              f.write("short=" + commit[:12] + "\n")
+
+      - name: Checkout exact unmodified LogVar source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.logvar.outputs.repository }}
+          ref: ${{ steps.logvar.outputs.commit }}
+          path: work/logvar-source
+          fetch-depth: 1
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
       - name: Install Android toolchain
         run: |
@@ -63,44 +85,114 @@ jobs:
       - name: Build release APK
         run: |
           gradle :app:assembleRelease --stacktrace
-          mkdir -p release-assets
+          mkdir -p release-assets out work
           cp app/build/outputs/apk/release/*.apk "release-assets/LogVarRemoteDemo-${{ steps.meta.outputs.tag }}.apk"
 
-      - name: Download unified FULL dependency inputs
+      - name: Download Node.js Mobile FULL
+        shell: bash
         run: |
           set -euo pipefail
-          mkdir -p work/bootstrap out
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-full.zip \
+            "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node-full.zip" | sha256sum -c -
 
-          curl -L --fail --retry 5 --retry-delay 2             -o work/node.zip             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
-          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node.zip" | sha256sum -c -
-
-          curl -L --fail --retry 5 --retry-delay 2             -o work/node-modules.zip             "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
-          echo "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7  work/node-modules.zip" | sha256sum -c -
-
-          BASE="https://raw.githubusercontent.com/lilixu3/danmu-api-android/4d75ca0420d2946956b34ed8c835b4912870a987/app/src/main/assets/nodejs-project"
-          for name in main.js android-server.js favorite-scheduler-host.js runtime-polyfills.js startup-failure.js worker-proxy.js; do
-            curl -L --fail --retry 5 --retry-delay 2 -o "work/bootstrap/$name" "$BASE/$name"
-          done
-
-          curl -L --fail --retry 5 --retry-delay 2             -o work/core-source.zip             "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
-
-      - name: Build all ABI dependency packages
+      - name: Package per-ABI Node Runtime
         env:
           NODE_VERSION: "24.21.0-0"
           NODE_FLAVOR: "full"
           NODE_UPSTREAM_SHA256: "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76"
-          SHELL_COMMIT: "4d75ca0420d2946956b34ed8c835b4912870a987"
-          RUNTIME_PACK_SHA256: "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"
-          CORE_COMMIT: "280b2327ccf06fb5e32a1db7051025359121a2c1"
+        run: python3 .github/scripts/package_node_runtime.py
+
+      - name: Rebuild LogVar dependencies from committed locks
+        shell: bash
         run: |
-          python3 .github/scripts/package_remote_deps.py
+          set -euo pipefail
+
+          build_deps() {
+            ABI="$1"
+            CPU="$2"
+            TARGET="work/logvar-$ABI"
+            LOCK=".runtime/locks/${{ steps.logvar.outputs.short }}/$ABI-package-lock.json"
+
+            test -f "$LOCK"
+            rm -rf "$TARGET"
+            mkdir -p "$TARGET"
+            cp work/logvar-source/package.json "$TARGET/package.json"
+            cp "$LOCK" "$TARGET/package-lock.json"
+
+            (
+              cd "$TARGET"
+              npm ci \
+                --omit=dev \
+                --ignore-scripts \
+                --no-audit \
+                --no-fund \
+                --os=android \
+                --cpu="$CPU"
+            )
+
+            cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
+          }
+
+          build_deps arm64-v8a arm64
+          build_deps armeabi-v7a arm
+          build_deps x86_64 x64
+
+      - name: Verify upstream source stayed untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C work/logvar-source status --porcelain)"
+          git -C work/logvar-source rev-parse HEAD | grep -Fx "${{ steps.logvar.outputs.commit }}"
+
+      - name: Package LogVar Runtime
+        env:
+          LOGVAR_REPOSITORY: ${{ steps.logvar.outputs.repository }}
+          LOGVAR_COMMIT: ${{ steps.logvar.outputs.commit }}
+        run: python3 .github/scripts/package_logvar_runtime.py
+
+      - name: Generate runtime manifest
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          node = json.loads(Path("out/node-runtime-manifest.json").read_text(encoding="utf-8"))
+          logvar = json.loads(Path("out/logvar-runtime-manifest.json").read_text(encoding="utf-8"))
+          manifest = {
+              "schemaVersion": 4,
+              "model": "node-plus-logvar",
+              "node": node,
+              "logvar": logvar,
+              "invariants": [
+                  "Node Runtime is always packaged per Android ABI.",
+                  "LogVar upstream source files are never modified.",
+                  "LogVar Runtime contains the complete upstream source snapshot plus resolved node_modules.",
+                  "Dependency lock files are maintained outside the upstream source tree.",
+                  "The server only needs to select a Node version and a LogVar version."
+              ]
+          }
+          Path("out/runtime-manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Collect release assets and checksums
+        shell: bash
+        run: |
           cp out/* release-assets/
-          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+          (
+            cd release-assets
+            sha256sum * > SHA256SUMS.txt
+          )
 
       - name: Generate release notes
         shell: python
         env:
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          LOGVAR_REPOSITORY: ${{ steps.logvar.outputs.repository }}
+          LOGVAR_COMMIT: ${{ steps.logvar.outputs.commit }}
         run: |
           import os
           from pathlib import Path
@@ -109,23 +201,18 @@ jobs:
           text = Path(".release/CHANGELOG.md").read_text(encoding="utf-8")
           marker = f"## {tag}"
           if marker in text:
-              section = text.split(marker, 1)[1]
-              section = section.split("\n## ", 1)[0].strip()
+              section = text.split(marker, 1)[1].split("\n## ", 1)[0].strip()
               notes = f"## {tag}\n\n{section}\n"
           else:
               notes = f"## {tag}\n\nTagged source release.\n"
 
           notes += (
-              "\n### Release assets\n\n"
-              "All three Android ABIs are first-class and independently packaged:\n\n"
-              "- arm64-v8a\n"
-              "- armeabi-v7a\n"
-              "- x86_64\n\n"
-              "They use the same Node.js Mobile FULL version, the same Android Bootstrap, "
-              "the same node_modules pack and the same LogVar Core. "
-              "Only ABI-specific native Node files differ.\n\n"
-              "The release also contains the universal APK, common dependency ZIPs, "
-              "remote-deps-manifest.json and SHA256SUMS.txt.\n"
+              "\n### Runtime model\n\n"
+              "- Node.js Mobile FULL is published independently for arm64-v8a, armeabi-v7a and x86_64.\n"
+              "- LogVar Runtime is the complete unmodified upstream source snapshot plus node_modules resolved for Android.\n"
+              "- LogVar dependency mode (universal or per-ABI) is selected automatically by CI.\n"
+              f"- Upstream LogVar: {os.environ['LOGVAR_REPOSITORY']} @ {os.environ['LOGVAR_COMMIT']}\n"
+              "- runtime-manifest.json is the canonical machine-readable asset index.\n"
           )
           Path("release-notes.md").write_text(notes, encoding="utf-8")
 
@@ -133,10 +220,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_SHA: ${{ steps.meta.outputs.sha }}
+        shell: bash
         run: |
-          if ! gh release view "${{ steps.meta.outputs.tag }}" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release create "${{ steps.meta.outputs.tag }}"               --repo "$GH_REPO"               --target "${{ steps.meta.outputs.sha }}"               --title "LogVar Remote Demo ${{ steps.meta.outputs.tag }}"               --notes-file release-notes.md
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --title "LogVar Remote Demo $RELEASE_TAG" \
+              --notes-file release-notes.md
           else
-            gh release edit "${{ steps.meta.outputs.tag }}"               --repo "$GH_REPO"               --title "LogVar Remote Demo ${{ steps.meta.outputs.tag }}"               --notes-file release-notes.md
+            gh release create "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --target "$RELEASE_SHA" \
+              --title "LogVar Remote Demo $RELEASE_TAG" \
+              --notes-file release-notes.md
           fi
-          gh release upload "${{ steps.meta.outputs.tag }}" release-assets/* --repo "$GH_REPO" --clobber
+
+          gh release upload "$RELEASE_TAG" release-assets/* \
+            --repo "$GH_REPO" \
+            --clobber
