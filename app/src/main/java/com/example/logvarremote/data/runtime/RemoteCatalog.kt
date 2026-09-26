@@ -41,17 +41,17 @@ object RemoteCatalog {
         "arm64-v8a" to RuntimeArtifact(
             fileName = "logvar-runtime-arm64-v8a-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-arm64-v8a-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "061dfba08ce395863a13563c49b7105fc7133e175344d86779d990c7f23261db"
+            sha256 = "2425a8f767ad9ea2216f7ea98e77602deb87dadb59003f767c87373f2fe4656a"
         ),
         "armeabi-v7a" to RuntimeArtifact(
             fileName = "logvar-runtime-armeabi-v7a-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-armeabi-v7a-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "ee39a1104def6308a05db8efb4061bb6ca6eb7a6cffc6e0f5173c58a7eee087f"
+            sha256 = "4a23b49231123fb3af627023cc43b2c4121b181cb3f17087a5b658a9162d2241"
         ),
         "x86_64" to RuntimeArtifact(
             fileName = "logvar-runtime-x86_64-$LOGVAR_SHORT_COMMIT.zip",
             url = "$RELEASE_BASE/logvar-runtime-x86_64-$LOGVAR_SHORT_COMMIT.zip",
-            sha256 = "79da6f780f3c3c0948fb4e4231e81582995ad5abde35ddbf6ada48a1b62a92c4"
+            sha256 = "196aea9fd0b73296e6f788145fa3ad6a317c6c6258ec6fa9286dbbb003089796"
         )
     )
 
