@@ -1,51 +1,132 @@
-name: Package remote dependencies
+name: Package runtime components
 
 on:
   push:
     branches: [ main ]
     paths:
+      - ".runtime/logvar-upstream.json"
       - ".github/workflows/package-remote-deps.yml"
-      - ".github/scripts/package_remote_deps.py"
+      - ".github/scripts/package_node_runtime.py"
+      - ".github/scripts/package_logvar_runtime.py"
   workflow_dispatch:
 
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout app repository
+        uses: actions/checkout@v4
 
-      - name: Download pinned FULL runtime inputs
+      - name: Resolve pinned LogVar upstream
+        id: logvar
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path(".runtime/logvar-upstream.json").read_text(encoding="utf-8"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("repository=" + data["repository"] + "\n")
+              f.write("commit=" + data["commit"] + "\n")
+
+      - name: Checkout exact unmodified LogVar source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.logvar.outputs.repository }}
+          ref: ${{ steps.logvar.outputs.commit }}
+          path: work/logvar-source
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download Node.js Mobile FULL
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p work/bootstrap out
+          mkdir -p work out
+          curl -L --fail --retry 5 --retry-delay 2             -o work/node-full.zip             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
+          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node-full.zip" | sha256sum -c -
 
-          curl -L --fail --retry 5 --retry-delay 2             -o work/node.zip             "https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip"
-          echo "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76  work/node.zip" | sha256sum -c -
-
-          curl -L --fail --retry 5 --retry-delay 2             -o work/node-modules.zip             "https://github.com/lilixu3/danmu-api-runtime-packs/releases/download/runtime-dependencies-4be12e7971f0/node_modules.zip"
-          echo "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7  work/node-modules.zip" | sha256sum -c -
-
-          BASE="https://raw.githubusercontent.com/lilixu3/danmu-api-android/4d75ca0420d2946956b34ed8c835b4912870a987/app/src/main/assets/nodejs-project"
-          for name in main.js android-server.js favorite-scheduler-host.js runtime-polyfills.js startup-failure.js worker-proxy.js; do
-            curl -L --fail --retry 5 --retry-delay 2 -o "work/bootstrap/$name" "$BASE/$name"
-          done
-
-          curl -L --fail --retry 5 --retry-delay 2             -o work/core-source.zip             "https://codeload.github.com/lilixu3/danmu_api/zip/280b2327ccf06fb5e32a1db7051025359121a2c1"
-
-      - name: Build all ABI packages from one dependency set
+      - name: Package per-ABI Node Runtime
         env:
           NODE_VERSION: "24.21.0-0"
           NODE_FLAVOR: "full"
           NODE_UPSTREAM_SHA256: "e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76"
-          SHELL_COMMIT: "4d75ca0420d2946956b34ed8c835b4912870a987"
-          RUNTIME_PACK_SHA256: "4be12e7971f079cd357496974113342f6839919a247e24b4fee69a594301c8a7"
-          CORE_COMMIT: "280b2327ccf06fb5e32a1db7051025359121a2c1"
-        run: python3 .github/scripts/package_remote_deps.py
+        run: python3 .github/scripts/package_node_runtime.py
 
-      - name: Upload unified dependency set
+      - name: Build LogVar node_modules for all Android ABIs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          build_deps() {
+            ABI="$1"
+            CPU="$2"
+            TARGET="work/logvar-$ABI"
+            rm -rf "$TARGET"
+            mkdir -p "$TARGET"
+            cp work/logvar-source/package.json "$TARGET/package.json"
+
+            (
+              cd "$TARGET"
+              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=false                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
+            )
+          }
+
+          build_deps arm64-v8a arm64
+          build_deps armeabi-v7a arm
+          build_deps x86_64 x64
+
+      - name: Verify upstream source stayed untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C work/logvar-source status --porcelain)"
+          git -C work/logvar-source rev-parse HEAD | grep -Fx "${{ steps.logvar.outputs.commit }}"
+
+      - name: Package LogVar source plus resolved dependencies
+        env:
+          LOGVAR_REPOSITORY: ${{ steps.logvar.outputs.repository }}
+          LOGVAR_COMMIT: ${{ steps.logvar.outputs.commit }}
+        run: python3 .github/scripts/package_logvar_runtime.py
+
+      - name: Generate two-component runtime manifest
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          node = json.loads(Path("out/node-runtime-manifest.json").read_text(encoding="utf-8"))
+          logvar = json.loads(Path("out/logvar-runtime-manifest.json").read_text(encoding="utf-8"))
+          manifest = {
+              "schemaVersion": 4,
+              "model": "node-plus-logvar",
+              "node": node,
+              "logvar": logvar,
+              "invariants": [
+                  "Node Runtime is always packaged per Android ABI.",
+                  "LogVar upstream source files are never modified.",
+                  "LogVar Runtime contains upstream source plus the node_modules resolved from its package.json.",
+                  "LogVar is universal only when all three dependency trees are byte-identical and contain no native binaries.",
+                  "Otherwise LogVar is published separately per ABI."
+              ]
+          }
+          Path("out/runtime-manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Generate checksums
+        run: |
+          cd out
+          sha256sum *.zip *.json > SHA256SUMS.txt
+
+      - name: Upload runtime candidate
         uses: actions/upload-artifact@v4
         with:
-          name: remote-dependency-zips
+          name: runtime-v6-candidate
           path: out/*
           compression-level: 0
