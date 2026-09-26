@@ -1,0 +1,123 @@
+name: Watch LogVar upstream
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout runtime tooling
+        uses: actions/checkout@v4
+
+      - name: Resolve latest upstream commit
+        id: meta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          REPOSITORY="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["repository"])')"
+          REF="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["ref"])')"
+          SHA="$(git ls-remote "https://github.com/$REPOSITORY.git" "refs/heads/$REF" | awk '{print $1}')"
+          test -n "$SHA"
+          SHORT="${SHA:0:12}"
+          RELEASE_TAG="logvar-upstream-$SHORT"
+
+          echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact upstream source
+        if: steps.meta.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.meta.outputs.repository }}
+          ref: ${{ steps.meta.outputs.sha }}
+          path: work/logvar-source
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        if: steps.meta.outputs.skip != 'true'
+        with:
+          node-version: "24"
+
+      - name: Resolve Android dependencies for all ABIs
+        if: steps.meta.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          build_deps() {
+            ABI="$1"
+            CPU="$2"
+            TARGET="work/logvar-$ABI"
+            rm -rf "$TARGET"
+            mkdir -p "$TARGET"
+            cp work/logvar-source/package.json "$TARGET/package.json"
+            (
+              cd "$TARGET"
+              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=false                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
+            )
+          }
+
+          build_deps arm64-v8a arm64
+          build_deps armeabi-v7a arm
+          build_deps x86_64 x64
+
+      - name: Verify source snapshot is untouched
+        if: steps.meta.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C work/logvar-source status --porcelain)"
+          git -C work/logvar-source rev-parse HEAD | grep -Fx "${{ steps.meta.outputs.sha }}"
+
+      - name: Package candidate
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          LOGVAR_REPOSITORY: ${{ steps.meta.outputs.repository }}
+          LOGVAR_COMMIT: ${{ steps.meta.outputs.sha }}
+        run: |
+          mkdir -p out
+          python3 .github/scripts/package_logvar_runtime.py
+          cd out
+          sha256sum *.zip *.json > SHA256SUMS.txt
+
+      - name: Create candidate prerelease
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          UPSTREAM_SHA: ${{ steps.meta.outputs.sha }}
+          UPSTREAM_REPOSITORY: ${{ steps.meta.outputs.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          Automated LogVar upstream candidate.
+
+          - Upstream repository: $UPSTREAM_REPOSITORY
+          - Upstream commit: $UPSTREAM_SHA
+          - Source modification: none
+          - node_modules: resolved independently for arm64-v8a, armeabi-v7a and x86_64
+          - Packaging mode is recorded in logvar-runtime-manifest.json
+
+          This is a prerelease candidate. Promoting it to the server stable channel is a separate decision.
+          EOF
+
+          gh release create "$RELEASE_TAG"             --repo "$GH_REPO"             --target "$GITHUB_SHA"             --title "LogVar upstream candidate ${UPSTREAM_SHA:0:12}"             --notes-file release-notes.md             --prerelease             out/*
