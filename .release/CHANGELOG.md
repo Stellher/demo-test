@@ -1,5 +1,14 @@
 # Version history
 
+## v0.6.1
+- Switched the canonical LogVar upstream repository from lilixu3/danmu_api to huangxd-/danmu_api.
+- Pinned the stable upstream snapshot to huangxd-/danmu_api commit fc1b7ff6add61d8af24c9bf978253273833f5afc.
+- Regenerated and committed Android dependency locks for arm64-v8a, armeabi-v7a and x86_64 from the official upstream package.json.
+- Rebuilt LogVar Runtime packages from the complete unmodified huangxd-/danmu_api source snapshot plus ABI-resolved node_modules.
+- Verified the stable rebuild using committed dependency locks; all three LogVar Runtime SHA-256 values reproduced exactly.
+- Kept Node.js Mobile FULL 24.21.0-0 unchanged; only the LogVar source/runtime lineage changed.
+- Updated scheduled upstream monitoring to follow huangxd-/danmu_api through the shared runtime upstream configuration.
+
 ## v0.6.0
 - Replaced the old combined Bootstrap/Core/dependencies bundle with a two-component runtime model: Node Runtime + LogVar Runtime.
 - Node.js Mobile FULL remains independently packaged for arm64-v8a, armeabi-v7a and x86_64.
