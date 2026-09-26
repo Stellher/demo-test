@@ -2,8 +2,12 @@ name: Publish tagged release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths:
+      - ".release/PUBLISH"
   workflow_run:
     workflows:
       - "Tag source version"
