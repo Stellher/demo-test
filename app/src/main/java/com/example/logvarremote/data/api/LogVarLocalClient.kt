@@ -11,7 +11,7 @@ class LogVarLocalClient(
 ) {
     fun health(): Boolean {
         val request = Request.Builder()
-            .url("http://127.0.0.1:${RemoteCatalog.PORT}/__health")
+            .url("http://127.0.0.1:${RemoteCatalog.PORT}/")
             .get()
             .build()
         return runCatching {
