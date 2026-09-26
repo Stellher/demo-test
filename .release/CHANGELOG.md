@@ -1,5 +1,19 @@
 # Version history
 
+## v0.6.0
+- Replaced the old combined Bootstrap/Core/dependencies bundle with a two-component runtime model: Node Runtime + LogVar Runtime.
+- Node.js Mobile FULL remains independently packaged for arm64-v8a, armeabi-v7a and x86_64.
+- LogVar Runtime now contains the complete unmodified upstream LogVar source snapshot plus node_modules resolved from the upstream package.json.
+- Removed build-time patches to LogVar envs.js and systemsettings.js; Android-specific behavior now lives outside the upstream source tree.
+- Added three-ABI dependency resolution and automatic universal/per-ABI LogVar packaging based on dependency tree and native/ELF inspection.
+- Added committed per-ABI dependency locks outside the upstream tree for reproducible npm resolution.
+- Added scheduled upstream monitoring that publishes new LogVar commits as prerelease candidates without automatically promoting them to stable.
+- Added an external Android host shim that restricts the upstream Node server to localhost and maps the proxy service to port 19322 without modifying LogVar.
+- Preserved environment config migration and defaults through config/.env rather than source patches.
+- Preserved Android WebView JSON export through an injected host-side download shim while leaving the upstream Web UI unchanged.
+- Removed legacy Bootstrap-only debugger routes and switched health checks to the upstream LogVar root page.
+- Server-side runtime selection can now be modeled with only nodeVersion and logvarVersion.
+
 ## v0.5.1
 - Fixed environment configuration export inside the Android WebView by bridging JSON export to Android's Storage Access Framework.
 - SOURCE_ORDER default is now: 360,vod,tmdb,douban,tencent,youku,iqiyi,imgo,bilibili,renren,hanjutv,dandan,migu.
