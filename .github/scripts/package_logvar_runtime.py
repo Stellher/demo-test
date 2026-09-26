@@ -119,8 +119,12 @@ for abi in ABIS:
             f"{abi} contains ELF files for another architecture: " +
             json.dumps(mismatched[:20], ensure_ascii=False)
         )
+    lock_path = WORK / f"logvar-{abi}" / "package-lock.json"
+    if not lock_path.is_file():
+        raise RuntimeError(f"Missing generated dependency lock for {abi}")
     dependency_info[abi] = {
         "treeSha256": tree_digest(root),
+        "lockSha256": sha256_file(lock_path),
         "nativeFiles": native,
         "nativeFileCount": len(native),
     }
@@ -141,6 +145,7 @@ def package_for(label: str, modules_root: Path):
         "packageJsonSha256": package_json_sha,
         "dependencyMode": mode,
         "dependencyTreeSha256": tree_digest(modules_root),
+        "dependencyLockSha256": dependency_info[label]["lockSha256"] if label in dependency_info else next(iter(dependency_info.values()))["lockSha256"],
         "sourceModified": False,
     }
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as dst:
