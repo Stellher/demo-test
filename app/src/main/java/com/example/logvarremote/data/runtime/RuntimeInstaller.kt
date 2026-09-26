@@ -16,66 +16,81 @@ class RuntimeInstaller(
 
     fun install(onProgress: (Progress) -> Unit) {
         val abi = chooseAbi()
-        val bundle = RemoteCatalog.runtimeBundle(abi)
+        val nodeArtifact = RemoteCatalog.nodeRuntime(abi)
+        val logvarArtifact = RemoteCatalog.logvarRuntime(abi)
+
         paths.ensureBaseDirs()
 
-        val bundleZip = File(
-            paths.downloadDir,
-            "logvar-runtime-${RemoteCatalog.NODE_FLAVOR}-$abi-${RemoteCatalog.NODE_VERSION}.zip"
-        )
+        val nodeZip = File(paths.downloadDir, nodeArtifact.fileName)
+        val logvarZip = File(paths.downloadDir, logvarArtifact.fileName)
 
-        onProgress(Progress("下载 FULL Node + LogVar Bundle ($abi)", 0f))
-        downloader.download(bundle.url, bundleZip) { done, total ->
-            onProgress(Progress("下载 FULL Node + LogVar Bundle ($abi)", fraction(done, total)))
+        onProgress(Progress("下载 Node.js Mobile FULL ($abi)", 0f))
+        downloader.download(nodeArtifact.url, nodeZip) { done, total ->
+            onProgress(Progress("下载 Node.js Mobile FULL ($abi)", fraction(done, total)))
         }
 
-        onProgress(Progress("校验 $abi Bundle SHA-256"))
-        FileIntegrity.requireSha256(bundleZip, bundle.sha256)
+        onProgress(Progress("校验 Node Runtime SHA-256"))
+        FileIntegrity.requireSha256(nodeZip, nodeArtifact.sha256)
 
-        val bundleStaging = File(paths.projectDir.parentFile, "bundle.staging")
-        bundleStaging.deleteRecursively()
-        bundleStaging.mkdirs()
+        val logvarTarget = if (RemoteCatalog.LOGVAR_DEPENDENCY_MODE == "universal") {
+            "universal"
+        } else {
+            abi
+        }
+        onProgress(Progress("下载原版 LogVar Runtime ($logvarTarget)", 0f))
+        downloader.download(logvarArtifact.url, logvarZip) { done, total ->
+            onProgress(Progress("下载原版 LogVar Runtime ($logvarTarget)", fraction(done, total)))
+        }
 
-        onProgress(Progress("解压 $abi 专用 Runtime"))
-        ZipTools.extractAll(bundleZip, bundleStaging)
+        onProgress(Progress("校验 LogVar Runtime SHA-256"))
+        FileIntegrity.requireSha256(logvarZip, logvarArtifact.sha256)
 
-        val runtimeStaging = File(bundleStaging, "runtime")
-        val projectStaging = File(bundleStaging, "project")
+        val stagingRoot = File(paths.downloadDir.parentFile, "install-v6.staging")
+        stagingRoot.deleteRecursively()
+        stagingRoot.mkdirs()
 
-        val stagingEnvFile = File(projectStaging, "config/.env")
+        onProgress(Progress("解压 Node + LogVar"))
+        ZipTools.extractAll(nodeZip, stagingRoot)
+        ZipTools.extractAll(logvarZip, stagingRoot)
+
+        val runtimeStaging = File(stagingRoot, "runtime")
+        val logvarStaging = File(stagingRoot, "logvar")
+
+        val stagingEnvFile = File(logvarStaging, "config/.env")
         stagingEnvFile.parentFile?.mkdirs()
-        if (paths.envFile.isFile) {
-            paths.envFile.copyTo(stagingEnvFile, overwrite = true)
-        } else if (!stagingEnvFile.exists()) {
-            stagingEnvFile.writeText("")
-        }
+        paths.existingEnvFile()?.copyTo(stagingEnvFile, overwrite = true)
         paths.ensureRuntimeConfigDefaults(stagingEnvFile)
 
-        File(projectStaging, "tmp").mkdirs()
+        File(logvarStaging, "tmp").mkdirs()
 
-        validateStaging(runtimeStaging, projectStaging)
+        validateStaging(runtimeStaging, logvarStaging)
         makeNativeFilesLoadable(runtimeStaging)
 
-        onProgress(Progress("原子替换 FULL $abi Runtime"))
-        replaceDir(runtimeStaging, paths.runtimeDir)
-        replaceDir(projectStaging, paths.projectDir)
-        bundleStaging.deleteRecursively()
+        onProgress(Progress("原子替换 Node + LogVar Runtime"))
+        replaceRuntimePair(runtimeStaging, logvarStaging)
+        stagingRoot.deleteRecursively()
+
+        paths.writeHostLauncher()
 
         paths.installedMarker.parentFile?.mkdirs()
         paths.installedMarker.writeText(
             buildString {
-                appendLine("node=${RemoteCatalog.NODE_VERSION}")
-                appendLine("flavor=${RemoteCatalog.NODE_FLAVOR}")
+                appendLine("schema=6")
                 appendLine("abi=$abi")
-                appendLine("bundleSha256=${bundle.sha256}")
-                appendLine("shell=${RemoteCatalog.ANDROID_SHELL_COMMIT}")
-                appendLine("deps=${RemoteCatalog.RUNTIME_PACK_SHA256}")
-                appendLine("core=${RemoteCatalog.CORE_COMMIT}")
+                appendLine("nodeVersion=${RemoteCatalog.NODE_VERSION}")
+                appendLine("nodeFlavor=${RemoteCatalog.NODE_FLAVOR}")
+                appendLine("nodeSha256=${nodeArtifact.sha256}")
+                appendLine("logvarRepository=${RemoteCatalog.LOGVAR_REPOSITORY}")
+                appendLine("logvarCommit=${RemoteCatalog.LOGVAR_COMMIT}")
+                appendLine("logvarDependencyMode=${RemoteCatalog.LOGVAR_DEPENDENCY_MODE}")
+                appendLine("logvarSha256=${logvarArtifact.sha256}")
+                appendLine("logvarSourceModified=false")
             }
         )
 
-        bundleZip.delete()
-        onProgress(Progress("安装完成：FULL Node / $abi", 1f))
+        nodeZip.delete()
+        logvarZip.delete()
+        onProgress(Progress("安装完成：Node + 原版 LogVar / $abi", 1f))
     }
 
     private fun chooseAbi(): String {
@@ -84,13 +99,13 @@ class RuntimeInstaller(
             ?: error("Unsupported ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
     }
 
-    private fun validateStaging(runtime: File, project: File) {
+    private fun validateStaging(runtime: File, logvar: File) {
         check(File(runtime, "libnode.so").isFile) { "Missing FULL libnode.so" }
-        check(File(project, "main.js").isFile) { "Missing Android main.js" }
-        check(File(project, "android-server.js").isFile) { "Missing android-server.js" }
-        check(File(project, "node_modules").isDirectory) { "Missing node_modules" }
-        check(File(project, "danmu_api_stable/worker.js").isFile) { "Missing LogVar worker.js" }
-        check(File(project, "config/.env").isFile) { "Missing writable LogVar config/.env" }
+        check(File(logvar, "package.json").isFile) { "Missing upstream package.json" }
+        check(File(logvar, "danmu_api/server.js").isFile) { "Missing upstream danmu_api/server.js" }
+        check(File(logvar, "danmu_api/worker.js").isFile) { "Missing upstream danmu_api/worker.js" }
+        check(File(logvar, "node_modules").isDirectory) { "Missing resolved node_modules" }
+        check(File(logvar, "config/.env").isFile) { "Missing writable LogVar config/.env" }
     }
 
     private fun makeNativeFilesLoadable(runtime: File) {
@@ -98,23 +113,50 @@ class RuntimeInstaller(
             ?.forEach { file ->
                 file.setReadable(true, false)
                 file.setExecutable(true, false)
-                check(file.setWritable(false, false)) { "Cannot mark ${file.name} read-only" }
+                check(file.setWritable(false, false)) {
+                    "Cannot mark ${file.name} read-only"
+                }
             }
     }
 
-    private fun replaceDir(staging: File, target: File) {
-        val backup = File(target.parentFile, target.name + ".backup")
-        backup.deleteRecursively()
-        if (target.exists() && !target.renameTo(backup)) {
-            error("Cannot create backup for ${target.name}")
+    private fun replaceRuntimePair(runtimeStaging: File, logvarStaging: File) {
+        val entries = listOf(
+            Triple(runtimeStaging, paths.runtimeDir, File(paths.runtimeDir.parentFile, "runtime.backup")),
+            Triple(logvarStaging, paths.logvarDir, File(paths.logvarDir.parentFile, "logvar.backup"))
+        )
+
+        entries.forEach { (_, target, backup) ->
+            backup.deleteRecursively()
+            if (target.exists() && !target.renameTo(backup)) {
+                error("Cannot create backup for ${target.name}")
+            }
         }
-        if (!staging.renameTo(target)) {
-            if (backup.exists()) backup.renameTo(target)
-            error("Cannot install ${target.name}")
+
+        val installed = mutableListOf<File>()
+        try {
+            entries.forEach { (staging, target, _) ->
+                if (!staging.renameTo(target)) {
+                    error("Cannot install ${target.name}")
+                }
+                installed += target
+            }
+        } catch (error: Throwable) {
+            installed.asReversed().forEach { it.deleteRecursively() }
+            entries.forEach { (_, target, backup) ->
+                if (backup.exists()) {
+                    backup.renameTo(target)
+                }
+            }
+            throw error
         }
-        backup.deleteRecursively()
+
+        entries.forEach { (_, _, backup) -> backup.deleteRecursively() }
     }
 
     private fun fraction(done: Long, total: Long): Float? =
-        if (total > 0L) (done.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else null
+        if (total > 0L) {
+            (done.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+        } else {
+            null
+        }
 }
