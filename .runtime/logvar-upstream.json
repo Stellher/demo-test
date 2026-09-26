@@ -3,5 +3,6 @@
   "ref": "main",
   "commit": "280b2327ccf06fb5e32a1db7051025359121a2c1",
   "policy": "stable-pinned",
-  "sourceModification": "none"
+  "sourceModification": "none",
+  "dependencyLockPolicy": "per-abi-committed"
 }
