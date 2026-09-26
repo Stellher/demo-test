@@ -61,10 +61,10 @@ APK 自己提供 `libc++_shared.so`，远程 Node 包不重复携带它。
 LogVar Runtime 直接使用上游仓库：
 
 ```text
-lilixu3/danmu_api
+huangxd-/danmu_api
 ```
 
-稳定版本由 `.runtime/logvar-upstream.json` 锁定到明确 commit。
+稳定版本由 `.runtime/logvar-upstream.json` 锁定到明确 commit。当前 v0.6.1 锁定 `fc1b7ff6add61d8af24c9bf978253273833f5afc`。
 
 核心原则：
 
