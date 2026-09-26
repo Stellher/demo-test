@@ -1,7 +1,7 @@
 {
-  "repository": "lilixu3/danmu_api",
+  "repository": "huangxd-/danmu_api",
   "ref": "main",
-  "commit": "280b2327ccf06fb5e32a1db7051025359121a2c1",
+  "commit": "fc1b7ff6add61d8af24c9bf978253273833f5afc",
   "policy": "stable-pinned",
   "sourceModification": "none",
   "dependencyLockPolicy": "per-abi-committed"
