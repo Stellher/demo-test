@@ -15,24 +15,30 @@ class NodeRuntimeManager(context: Context) {
         runCatching {
             check(paths.isInstalled()) { "Runtime is not installed" }
 
-            // LogVar NodeHandler saves Web-panel environment variables here.
-            // Older demo installs only created config/, so ensure .env exists before Node starts.
+            // The upstream LogVar NodeHandler persists Web-panel settings to config/.env.
+            // Defaults are supplied as runtime data, never by modifying upstream source.
             paths.ensureRuntimeConfigFile()
+            paths.writeHostLauncher()
 
-            check(starting.compareAndSet(false, true)) { "Node is already running/starting in this app process" }
+            check(starting.compareAndSet(false, true)) {
+                "Node is already running/starting in this app process"
+            }
 
             val libcxx = paths.libcxxLib.takeIf { it.isFile }?.absolutePath
             Thread({
                 val rc = NativeNodeBridge.startNode(
                     libNodePath = paths.nodeLib.absolutePath,
                     libcxxPath = libcxx,
-                    projectDir = paths.projectDir.absolutePath,
-                    entryScript = paths.mainJs.absolutePath,
+                    projectDir = paths.logvarDir.absolutePath,
+                    entryScript = paths.hostEntry.absolutePath,
                     port = RemoteCatalog.PORT,
                     token = RemoteCatalog.TOKEN
                 )
                 starting.set(false)
-                android.util.Log.i("NodeRuntimeManager", "node::Start returned $rc: ${NativeNodeBridge.lastError()}")
+                android.util.Log.i(
+                    "NodeRuntimeManager",
+                    "node::Start returned $rc: ${NativeNodeBridge.lastError()}"
+                )
             }, "logvar-node").apply {
                 isDaemon = true
                 start()
