@@ -1,9 +1,36 @@
 {
   "repository": "huangxd-/danmu_api",
   "ref": "main",
-  "commit": "fc1b7ff6add61d8af24c9bf978253273833f5afc",
-  "policy": "stable-pinned",
+  "commit": "afc8b8119f981492a5caee52f1e1ebf756bd0d41",
+  "shortCommit": "afc8b8119f98",
+  "policy": "auto-follow-upstream",
   "sourceModification": "none",
   "dependencyLockPolicy": "per-abi-committed",
-  "dependencyLockCommit": "01f9b043f640d9b0ef9a00fd92430e8af05c2bdc"
+  "dependencyMode": "per-abi",
+  "releaseTag": "logvar-runtime-afc8b8119f98",
+  "releaseUrl": "https://github.com/Stellher/demo-test/releases/tag/logvar-runtime-afc8b8119f98",
+  "manifestSha256": "c4004c5d411ae6d2501dfd020549a0e073a1a542b7d1f7a8afc5571cd36b7e7c",
+  "artifacts": {
+    "arm64-v8a": {
+      "file": "logvar-runtime-arm64-v8a-afc8b8119f98.zip",
+      "sha256": "709c6a7cd23b4ce1aae220e0164901d519c2bc9ed050b4f007848151688ff44b",
+      "bytes": 29526162,
+      "dependencyTreeSha256": "b142e2a49ce1a7de6f152d73a8f2187cc6b38f238d2b5ec65f1fd363c0f91ca1",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-afc8b8119f98/logvar-runtime-arm64-v8a-afc8b8119f98.zip"
+    },
+    "armeabi-v7a": {
+      "file": "logvar-runtime-armeabi-v7a-afc8b8119f98.zip",
+      "sha256": "051f5001acd196f4f6b6435ebe3a9f23c8cbe0c5c1a2178b5baabdcd3421b33f",
+      "bytes": 28684857,
+      "dependencyTreeSha256": "9e3d72b266d4484cd7422829d22092a5a05790d286ae439a5f1eda2b2ee49dc4",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-afc8b8119f98/logvar-runtime-armeabi-v7a-afc8b8119f98.zip"
+    },
+    "x86_64": {
+      "file": "logvar-runtime-x86_64-afc8b8119f98.zip",
+      "sha256": "3751f8266ef41c4cc6af64e5740be5828b54b497e0c6bb0d25a8e90df82a464f",
+      "bytes": 28684860,
+      "dependencyTreeSha256": "d3507ebf5d629ecfb9db2c6ca98b361510646fbd0f60d98c66a3fc3fcdc1ba0d",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-afc8b8119f98/logvar-runtime-x86_64-afc8b8119f98.zip"
+    }
+  }
 }
