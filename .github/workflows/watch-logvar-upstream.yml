@@ -1,6 +1,10 @@
 name: Watch LogVar upstream
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - ".github/workflows/watch-logvar-upstream.yml"
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
@@ -140,6 +144,17 @@ jobs:
                   lock_dir / f"{abi}-package-lock.json",
               )
 
+          release_tag = os.environ["RELEASE_TAG"]
+          github_repository = os.environ["GITHUB_REPOSITORY"]
+          artifacts = {}
+          for key, value in manifest["artifacts"].items():
+              item = dict(value)
+              item["url"] = (
+                  f"https://github.com/{github_repository}/releases/download/"
+                  f"{release_tag}/{item['file']}"
+              )
+              artifacts[key] = item
+
           metadata = {
               "repository": os.environ["UPSTREAM_REPOSITORY"],
               "ref": os.environ["UPSTREAM_REF"],
@@ -149,11 +164,12 @@ jobs:
               "sourceModification": "none",
               "dependencyLockPolicy": "per-abi-committed",
               "dependencyMode": manifest["dependencyMode"],
-              "releaseTag": os.environ["RELEASE_TAG"],
+              "releaseTag": release_tag,
+              "releaseUrl": f"https://github.com/{github_repository}/releases/tag/{release_tag}",
               "manifestSha256": __import__("hashlib").sha256(
                   Path("out/logvar-runtime-manifest.json").read_bytes()
               ).hexdigest(),
-              "artifacts": manifest["artifacts"],
+              "artifacts": artifacts,
           }
 
           Path(".runtime/logvar-upstream.json").write_text(
