@@ -8,41 +8,51 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: logvar-upstream-sync
+  cancel-in-progress: false
+
 jobs:
-  build-candidate:
+  sync-runtime:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout runtime tooling
+      - name: Checkout runtime repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Resolve latest upstream commit
+      - name: Resolve upstream state
         id: meta
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+
           REPOSITORY="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["repository"])')"
           REF="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["ref"])')"
+          CURRENT="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json")).get("commit", ""))')"
           SHA="$(git ls-remote "https://github.com/$REPOSITORY.git" "refs/heads/$REF" | awk '{print $1}')"
           test -n "$SHA"
+
           SHORT="${SHA:0:12}"
-          RELEASE_TAG="logvar-upstream-$SHORT"
+          RELEASE_TAG="logvar-runtime-$SHORT"
 
           echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "short=$SHORT" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          if [ "$SHA" = "$CURRENT" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Upstream is unchanged: $SHA"
           else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Upstream changed: $CURRENT -> $SHA"
           fi
 
       - name: Checkout exact upstream source
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.meta.outputs.changed == 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ steps.meta.outputs.repository }}
@@ -51,12 +61,12 @@ jobs:
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.meta.outputs.changed == 'true'
         with:
           node-version: "24"
 
       - name: Resolve Android dependencies for all ABIs
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.meta.outputs.changed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -73,14 +83,7 @@ jobs:
 
             (
               cd "$TARGET"
-              npm install \
-                --omit=dev \
-                --ignore-scripts \
-                --package-lock=true \
-                --no-audit \
-                --no-fund \
-                --os=android \
-                --cpu="$CPU"
+              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=true                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
             )
 
             cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
@@ -90,26 +93,112 @@ jobs:
           build_deps armeabi-v7a arm
           build_deps x86_64 x64
 
-      - name: Verify source snapshot is untouched
-        if: steps.meta.outputs.skip != 'true'
+      - name: Verify upstream source stayed untouched
+        if: steps.meta.outputs.changed == 'true'
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git -C work/logvar-source status --porcelain)"
           git -C work/logvar-source rev-parse HEAD | grep -Fx "${{ steps.meta.outputs.sha }}"
 
-      - name: Package candidate
-        if: steps.meta.outputs.skip != 'true'
+      - name: Package LogVar Runtime
+        if: steps.meta.outputs.changed == 'true'
         env:
           LOGVAR_REPOSITORY: ${{ steps.meta.outputs.repository }}
           LOGVAR_COMMIT: ${{ steps.meta.outputs.sha }}
+        run: python3 .github/scripts/package_logvar_runtime.py
+
+      - name: Generate checksums
+        if: steps.meta.outputs.changed == 'true'
         run: |
-          python3 .github/scripts/package_logvar_runtime.py
           cd out
           sha256sum *.zip *.json > SHA256SUMS.txt
 
-      - name: Create candidate prerelease
-        if: steps.meta.outputs.skip != 'true'
+      - name: Update repository runtime metadata
+        if: steps.meta.outputs.changed == 'true'
+        shell: python
+        env:
+          UPSTREAM_REPOSITORY: ${{ steps.meta.outputs.repository }}
+          UPSTREAM_REF: ${{ steps.meta.outputs.ref }}
+          UPSTREAM_COMMIT: ${{ steps.meta.outputs.sha }}
+          UPSTREAM_SHORT: ${{ steps.meta.outputs.short }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+        run: |
+          import json
+          import os
+          import shutil
+          from pathlib import Path
+
+          manifest = json.loads(Path("out/logvar-runtime-manifest.json").read_text(encoding="utf-8"))
+          short = os.environ["UPSTREAM_SHORT"]
+          lock_dir = Path(".runtime/locks") / short
+          lock_dir.mkdir(parents=True, exist_ok=True)
+
+          for abi in ("arm64-v8a", "armeabi-v7a", "x86_64"):
+              shutil.copyfile(
+                  Path("out") / f"dependency-lock-{abi}.json",
+                  lock_dir / f"{abi}-package-lock.json",
+              )
+
+          metadata = {
+              "repository": os.environ["UPSTREAM_REPOSITORY"],
+              "ref": os.environ["UPSTREAM_REF"],
+              "commit": os.environ["UPSTREAM_COMMIT"],
+              "shortCommit": short,
+              "policy": "auto-follow-upstream",
+              "sourceModification": "none",
+              "dependencyLockPolicy": "per-abi-committed",
+              "dependencyMode": manifest["dependencyMode"],
+              "releaseTag": os.environ["RELEASE_TAG"],
+              "manifestSha256": __import__("hashlib").sha256(
+                  Path("out/logvar-runtime-manifest.json").read_bytes()
+              ).hexdigest(),
+              "artifacts": manifest["artifacts"],
+          }
+
+          Path(".runtime/logvar-upstream.json").write_text(
+              json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Commit runtime metadata and dependency locks
+        if: steps.meta.outputs.changed == 'true'
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .runtime/logvar-upstream.json ".runtime/locks/${{ steps.meta.outputs.short }}"
+          git commit -m "runtime: sync LogVar ${{ steps.meta.outputs.short }} from upstream"
+
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+
+          SYNC_COMMIT="$(git rev-parse HEAD)"
+          echo "sync_commit=$SYNC_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable runtime tag
+        if: steps.meta.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.meta.outputs.release_tag }}"
+          TARGET="${{ steps.commit.outputs.sync_commit }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag already exists: $TAG"
+          else
+            git tag -a "$TAG" "$TARGET" -m "LogVar runtime ${{ steps.meta.outputs.short }}"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish formal Runtime Release
+        if: steps.meta.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -119,23 +208,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           cat > release-notes.md <<EOF
-          Automated LogVar upstream candidate.
+          Automated LogVar Runtime release.
 
           - Upstream repository: $UPSTREAM_REPOSITORY
           - Upstream commit: $UPSTREAM_SHA
           - Source modification: none
-          - node_modules: resolved independently for arm64-v8a, armeabi-v7a and x86_64
-          - Per-ABI dependency lock files are included with the candidate
-          - Packaging mode is recorded in logvar-runtime-manifest.json
-
-          This is a prerelease candidate. Promoting it to the server stable channel is a separate decision.
+          - Android ABIs: arm64-v8a, armeabi-v7a, x86_64
+          - Runtime ZIP SHA-256 values are recorded in logvar-runtime-manifest.json and SHA256SUMS.txt
+          - This release only updates repository-side LogVar Runtime assets. Android application source/version is not changed.
           EOF
 
-          gh release create "$RELEASE_TAG" \
-            --repo "$GH_REPO" \
-            --target "$GITHUB_SHA" \
-            --title "LogVar upstream candidate ${UPSTREAM_SHA:0:12}" \
-            --notes-file release-notes.md \
-            --prerelease \
-            out/*
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG"               --repo "$GH_REPO"               --title "LogVar Runtime ${UPSTREAM_SHA:0:12}"               --notes-file release-notes.md               --prerelease=false
+            gh release upload "$RELEASE_TAG" out/* --repo "$GH_REPO" --clobber
+          else
+            gh release create "$RELEASE_TAG"               --repo "$GH_REPO"               --target "${{ steps.commit.outputs.sync_commit }}"               --title "LogVar Runtime ${UPSTREAM_SHA:0:12}"               --notes-file release-notes.md               out/*
+          fi
