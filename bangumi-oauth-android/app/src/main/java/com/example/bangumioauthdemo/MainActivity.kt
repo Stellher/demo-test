@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -32,12 +34,21 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        OAuthSessionManager.initialize(application)
+        if (OAuthSessionManager.session.value != null) RefreshScheduler.schedule(application)
         setContent {
             MaterialTheme {
                 AppShell(oauth, explorer, ::openUrl)
             }
         }
         oauth.callback(intent?.data)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (OAuthSessionManager.session.value != null) {
+            lifecycleScope.launch { OAuthSessionManager.ensureValidToken() }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -111,6 +122,7 @@ private fun OAuthScreen(vm: OAuthViewModel, openUrl: (String) -> Unit) {
     val output by vm.output.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val refreshState by vm.refreshState.collectAsStateWithLifecycle()
     var showTokens by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     Column(
@@ -153,9 +165,12 @@ private fun OAuthScreen(vm: OAuthViewModel, openUrl: (String) -> Unit) {
             LabeledValue("Scope", current.scope)
             LabeledValue("expires_in", current.expiresIn.toString() + " 秒")
             LabeledValue("预计过期", DateFormat.getDateTimeInstance().format(Date(current.expiresAtMillis)))
-            Text("以上凭据仅在当前 App 进程内使用；切换到「全部 API」后，会自动附带 Bearer Token。",
+            Text("Token 已加密保存，重启 App 无需重新登录；API 请求自动使用最新 Bearer Token。",
                 style = MaterialTheme.typography.bodySmall)
         }
+        LabeledValue("自动续期状态", refreshState.message)
+        Text("自动刷新：有效期不足 24 小时时尝试续期；WorkManager 约每 12 小时检查一次（受系统后台调度限制）。",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = vm::refresh, enabled = !busy && session != null, modifier = Modifier.weight(1f)) {
                 Text("刷新 Token")
