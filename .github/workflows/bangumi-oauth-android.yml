@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Install Android SDK 35
+      - name: Install Android SDK 37
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
@@ -48,7 +48,7 @@ jobs:
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
       - name: Add Gradle wrapper to distributable source
-        run: gradle --no-daemon -p bangumi-oauth-android wrapper --gradle-version 8.11.1
+        run: gradle --no-daemon -p bangumi-oauth-android wrapper --gradle-version 9.7.1
       - name: Package Android Studio source
         run: |
           zip -qr bangumi-glass-source.zip bangumi-oauth-android \
