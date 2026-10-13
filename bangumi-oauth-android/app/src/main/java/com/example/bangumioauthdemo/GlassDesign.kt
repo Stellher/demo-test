@@ -95,7 +95,7 @@ fun LiquidNavigation(
                 effects = {
                     vibrancy()
                     blur(5.dp.toPx())
-                    lens(12.dp.toPx(), 16.dp.toPx())
+                    if (android.os.Build.VERSION.SDK_INT >= 33) lens(12.dp.toPx(), 16.dp.toPx())
                 },
                 onDrawSurface = { drawRect(Color(0xDAFFFFFF)) }
             )
