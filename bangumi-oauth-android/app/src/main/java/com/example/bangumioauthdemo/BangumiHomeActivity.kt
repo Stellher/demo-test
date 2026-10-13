@@ -7,6 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.graphics.drawscope.drawRect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -55,84 +60,235 @@ private fun BangumiHomeApp(
     vm: BangumiBrowseViewModel,
     openOAuthLab: () -> Unit
 ) {
-    val backdrop = rememberLayerBackdrop()
+    // The page including the real background must be captured before the
+    // floating bars and sheets sample it. No glass surface captures itself.
+    val backdrop = rememberLayerBackdrop {
+        drawRect(Pale)
+        drawContent()
+    }
     val snackHost = remember { SnackbarHostState() }
-    var currentTab by remember { mutableIntStateOf(0) }
-    var searchOpen by remember { mutableStateOf(false) }
-    val subject = vm.selectedSubject
-    val person = vm.selectedPerson
-    val overlay = searchOpen || subject != null || person != null
+    var currentTab by rememberSaveable { mutableIntStateOf(0) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var seasonFiltersOpen by remember { mutableStateOf(false) }
+    var collectionEditorOpen by remember { mutableStateOf(false) }
+    var quickPreview by remember { mutableStateOf<AnimeCard?>(null) }
 
-    fun goBack() {
+    val subjectId = vm.selectedSubject
+    val personId = vm.selectedPerson
+    val overlay = searchOpen || subjectId != null || personId != null
+    val visibleRoute = when {
+        personId != null -> "person:${personId.first}"
+        subjectId != null -> "subject:$subjectId"
+        searchOpen -> "search"
+        else -> "tab:$currentTab"
+    }
+    fun back() {
         when {
-            person != null -> vm.closePerson()
-            subject != null -> vm.closeSubject()
+            personId != null -> vm.closePerson()
+            subjectId != null -> vm.closeSubject()
             searchOpen -> searchOpen = false
-            else -> currentTab = 0
+            currentTab != 0 -> currentTab = 0
         }
     }
+    BackHandler(enabled = overlay || currentTab != 0) { back() }
 
-    BackHandler(enabled = overlay) { goBack() }
-    val message = vm.actionFeedback
-    LaunchedEffect(message) {
-        if (message != null) {
-            snackHost.showSnackbar(message)
+    // Reset collection sheet when moving to a different title.
+    LaunchedEffect(subjectId) { collectionEditorOpen = false }
+    val feedback = vm.actionFeedback
+    LaunchedEffect(feedback) {
+        if (feedback != null) {
+            snackHost.showSnackbar(feedback)
             vm.dismissFeedback()
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        GlassBackdropBackground()
-        Box(
-            Modifier.fillMaxSize()
-                .layerBackdrop(backdrop)
-                .statusBarsPadding()
-        ) {
-            when {
-                person != null -> PersonPage(vm, back = { vm.closePerson() })
-                subject != null -> SubjectPage(
-                    vm = vm,
-                    back = { vm.closeSubject() },
-                    openSubject = vm::openSubject,
-                    openPerson = vm::openPerson,
-                    openLogin = openOAuthLab
-                )
-                searchOpen -> SearchPage(
-                    vm = vm,
-                    onBack = { searchOpen = false },
-                    openSubject = vm::openSubject,
-                    openPerson = vm::openPerson
-                )
-                else -> when (currentTab) {
-                    0 -> DiscoverPage(
-                        vm = vm,
-                        openSubject = vm::openSubject,
-                        openSearch = { searchOpen = true },
-                        goToTab = { currentTab = it }
-                    )
-                    1 -> CalendarPage(vm, openSubject = vm::openSubject)
-                    2 -> SeasonPage(vm, openSubject = vm::openSubject)
-                    3 -> LibraryPage(vm, openSubject = vm::openSubject, onLogin = openOAuthLab)
-                    else -> ProfilePage(
-                        vm = vm,
-                        onLogin = openOAuthLab,
-                        onOpenLibrary = { currentTab = 3 },
-                        onOpenApiLab = openOAuthLab,
-                        onOpenSearch = { searchOpen = true }
-                    )
+    val topTitle = when (currentTab) {
+        0 -> "Bangumi · 发现"
+        1 -> "每日放送"
+        2 -> "季度新番"
+        3 -> "我的收藏"
+        else -> "个人中心"
+    }
+
+    CompositionLocalProvider(
+        LocalGlassBackdrop provides backdrop,
+        LocalAnimePreviewHandler provides { item: AnimeCard ->
+            quickPreview = item
+        }
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+                GlassBackdropBackground()
+                Box(
+                    Modifier.fillMaxSize().statusBarsPadding()
+                        .padding(top = if (overlay) 0.dp else 72.dp)
+                ) {
+                    AnimatedContent(
+                        targetState = visibleRoute,
+                        modifier = Modifier.fillMaxSize(),
+                        transitionSpec = {
+                            val enteringDetail = targetState.startsWith("subject:") ||
+                                targetState.startsWith("person:") ||
+                                targetState == "search"
+                            val forward = enteringDetail ||
+                                targetState.substringAfter("tab:", "0").toIntOrNull()
+                                    .let { (it ?: 0) >= (initialState.substringAfter("tab:", "0").toIntOrNull() ?: 0) }
+                            val horizontal = if (forward) 1 else -1
+                            (
+                                fadeIn(tween(210)) +
+                                    slideInHorizontally(tween(340)) { it * horizontal / 5 }
+                            ) togetherWith (
+                                fadeOut(tween(190)) +
+                                    slideOutHorizontally(tween(330)) { -it * horizontal / 6 }
+                            )
+                        },
+                        label = "bangumiGlassNavigation"
+                    ) { route ->
+                        when {
+                            route.startsWith("person:") -> PersonPage(
+                                vm = vm, back = { vm.closePerson() }
+                            )
+                            route.startsWith("subject:") -> SubjectPage(
+                                vm = vm,
+                                back = { vm.closeSubject() },
+                                openSubject = vm::openSubject,
+                                openPerson = vm::openPerson,
+                                openLogin = openOAuthLab,
+                                onEditCollection = { collectionEditorOpen = true }
+                            )
+                            route == "search" -> SearchPage(
+                                vm = vm,
+                                onBack = { searchOpen = false },
+                                openSubject = vm::openSubject,
+                                openPerson = vm::openPerson
+                            )
+                            route == "tab:0" -> DiscoverPage(
+                                vm = vm,
+                                openSubject = vm::openSubject,
+                                openSearch = { searchOpen = true },
+                                goToTab = { currentTab = it }
+                            )
+                            route == "tab:1" -> CalendarPage(
+                                vm = vm, openSubject = vm::openSubject
+                            )
+                            route == "tab:2" -> SeasonPage(
+                                vm = vm,
+                                openSubject = vm::openSubject,
+                                openFilters = { seasonFiltersOpen = true }
+                            )
+                            route == "tab:3" -> LibraryPage(
+                                vm = vm,
+                                openSubject = vm::openSubject,
+                                onLogin = openOAuthLab
+                            )
+                            else -> ProfilePage(
+                                vm = vm,
+                                onLogin = openOAuthLab,
+                                onOpenLibrary = { currentTab = 3 },
+                                onOpenApiLab = openOAuthLab,
+                                onOpenSearch = { searchOpen = true }
+                            )
+                        }
+                    }
                 }
             }
-        }
-        if (!overlay) {
-            LiquidNavigation(
-                backdrop = backdrop,
-                selected = currentTab,
-                onSelected = { currentTab = it },
-                modifier = Modifier.align(Alignment.BottomCenter)
+
+            // Foreground layers intentionally live outside layerBackdrop.
+            if (!overlay) {
+                LiquidTopBar(
+                    title = topTitle,
+                    leadingIcon = Icons.Outlined.AutoAwesome,
+                    onLeading = { currentTab = 0 },
+                    modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                    actions = {
+                        when (currentTab) {
+                            0 -> LiquidIconAction(
+                                Icons.Outlined.Search, "搜索",
+                                onClick = { searchOpen = true },
+                                modifier = Modifier.size(38.dp)
+                            )
+                            1 -> LiquidIconAction(
+                                Icons.Outlined.Refresh, "刷新放送",
+                                onClick = { vm.loadCalendar(force = true) },
+                                modifier = Modifier.size(38.dp)
+                            )
+                            2 -> {
+                                LiquidIconAction(
+                                    Icons.Outlined.FilterList, "筛选动画",
+                                    onClick = { seasonFiltersOpen = true },
+                                    modifier = Modifier.size(38.dp)
+                                )
+                                LiquidIconAction(
+                                    Icons.Outlined.Refresh, "刷新季度",
+                                    onClick = { vm.loadSeason(force = true) },
+                                    modifier = Modifier.size(38.dp)
+                                )
+                            }
+                            3 -> LiquidIconAction(
+                                Icons.Outlined.Refresh, "刷新收藏",
+                                onClick = { vm.loadLibrary(force = true) },
+                                modifier = Modifier.size(38.dp)
+                            )
+                            else -> LiquidIconAction(
+                                Icons.Outlined.Settings, "授权与设置",
+                                onClick = openOAuthLab,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+                    }
+                )
+                LiquidNavigation(
+                    backdrop = backdrop,
+                    selected = currentTab,
+                    onSelected = { currentTab = it },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                )
+            }
+
+            SnackbarHost(
+                snackHost, modifier = Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
+                    .padding(bottom = if (overlay) 10.dp else 101.dp)
+            )
+
+            GlassSeasonFilterSheet(
+                visible = seasonFiltersOpen && !overlay,
+                vm = vm,
+                onDismiss = { seasonFiltersOpen = false }
+            )
+
+            val editable = vm.subject.data
+            GlassCollectionEditor(
+                visible = collectionEditorOpen && editable != null && subjectId != null,
+                existing = editable?.collection,
+                busy = vm.actionBusy,
+                onDismiss = { collectionEditorOpen = false },
+                onSave = { edit ->
+                    subjectId?.let { id ->
+                        vm.updateCollection(id, edit) { collectionEditorOpen = false }
+                    }
+                }
+            )
+
+            GlassQuickPreviewSheet(
+                subject = quickPreview,
+                onDismiss = { quickPreview = null },
+                onOpen = { id ->
+                    quickPreview = null
+                    vm.openSubject(id)
+                },
+                onCollect = { id ->
+                    quickPreview = null
+                    vm.openSubject(id)
+                    if (vm.authorization.value == null) {
+                        openOAuthLab()
+                    } else {
+                        // Subject details load before opening the editing form.
+                        collectionEditorOpen = true
+                    }
+                }
             )
         }
-        SnackbarHost(snackHost, modifier = Modifier.align(Alignment.BottomCenter)
-            .navigationBarsPadding().padding(bottom = if (overlay) 10.dp else 94.dp))
     }
 }
