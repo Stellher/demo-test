@@ -150,19 +150,18 @@ class BangumiRepository {
     ).pageData().map(JSONObject::episode).filter { it.id > 0 }
 
     suspend fun characters(id: Int): List<PersonCard> =
-        objectResponse("/v0/subjects/" + id + "/characters")
-            .let { parent ->
-                parent.pageData().ifEmpty { parent.arr("data").jsonItems() }
-            }.map { it.person("角色") }.filter { it.id > 0 }
+        JSONArray(request("/v0/subjects/" + id + "/characters"))
+            .jsonItems().map { it.person("角色") }.filter { it.id > 0 }
 
     suspend fun staff(id: Int): List<PersonCard> =
-        objectResponse("/v0/subjects/" + id + "/persons")
-            .pageData().map { it.person("制作") }.filter { it.id > 0 }
+        JSONArray(request("/v0/subjects/" + id + "/persons"))
+            .jsonItems().map { it.person("制作") }.filter { it.id > 0 }
 
     suspend fun related(id: Int): List<AnimeCard> =
-        objectResponse("/v0/subjects/" + id + "/subjects")
-            .pageData().map { it.obj("subject").takeIf { data -> data.has("id") }?.card() ?: it.card() }
-            .filter { it.id > 0 }
+        JSONArray(request("/v0/subjects/" + id + "/subjects"))
+            .jsonItems().map { item ->
+                item.optJSONObject("subject")?.card() ?: item.card()
+            }.filter { it.id > 0 }
 
     suspend fun person(id: Int, isCharacter: Boolean): JSONObject =
         objectResponse("/v0/" + (if (isCharacter) "characters/" else "persons/") + id)
@@ -178,11 +177,7 @@ class BangumiRepository {
         subjectType: Int? = null
     ): List<CollectionCard> {
         require(username.isNotBlank())
-        return objectResponse(
-            "/v0/users/" + okhttp3.HttpUrl.Builder().scheme("https").host("api.bgm.tv")
-                .addPathSegment(username).build().encodedPath.removePrefix("/users/").removePrefix("/"),
-            emptyMap()
-        ).let { null } ?: actualCollections(username, type, offset, subjectType)
+        return actualCollections(username, type, offset, subjectType)
     }
 
     private suspend fun actualCollections(
