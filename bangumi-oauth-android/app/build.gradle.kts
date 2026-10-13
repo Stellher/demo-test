@@ -37,4 +37,7 @@ dependencies {
   implementation("io.github.kyant0:backdrop:1.0.0")
   implementation("androidx.compose.material:material-icons-extended:1.7.8")
   implementation("androidx.work:work-runtime-ktx:2.10.1")
+  implementation("io.coil-kt:coil-compose:2.7.0")
+  implementation("androidx.compose.material:material-icons-extended")
+  implementation("io.github.kyant0:backdrop:2.0.1")
 }
