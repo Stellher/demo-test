@@ -1,6 +1,12 @@
 package com.example.bangumioauthdemo
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,7 +75,11 @@ fun GlassBackdropBackground() {
     }
 }
 
-/** Kyant Backdrop is restricted to navigation + floating controls for smoother scrolling. */
+/**
+ * Kyant Backdrop navigation. The glass selection has its own lens and blur,
+ * while the whole floating bar samples the page's backdrop. Press feedback
+ * uses spring scaling and the pressed state from Compose interactions.
+ */
 @Composable
 fun LiquidNavigation(
     backdrop: Backdrop,
@@ -88,41 +98,71 @@ fun LiquidNavigation(
     Row(
         modifier = modifier
             .padding(horizontal = 15.dp, vertical = 8.dp)
-            .shadow(14.dp, RoundedCornerShape(32.dp), ambientColor = Blue.copy(alpha = 0.1f))
+            .shadow(16.dp, RoundedCornerShape(34.dp), ambientColor = Blue.copy(alpha = 0.12f))
             .drawBackdrop(
                 backdrop = backdrop,
-                shape = { RoundedCornerShape(32.dp) },
+                shape = { RoundedCornerShape(34.dp) },
                 effects = {
                     vibrancy()
-                    blur(5.dp.toPx())
-                    if (android.os.Build.VERSION.SDK_INT >= 33) lens(12.dp.toPx(), 16.dp.toPx())
+                    blur(6.dp.toPx())
+                    if (android.os.Build.VERSION.SDK_INT >= 33) lens(13.dp.toPx(), 17.dp.toPx())
                 },
-                onDrawSurface = { drawRect(Color(0xDAFFFFFF)) }
+                onDrawSurface = { drawRect(Color(0xB8FFFFFF)) }
             )
-            .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(32.dp))
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(34.dp))
+            .padding(horizontal = 7.dp, vertical = 7.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
         names.forEachIndexed { index, label ->
-            Column(
-                Modifier.weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(
-                        if (selected == index) Color(0xFFE0E8FF).copy(alpha = .86f)
-                        else Color.Transparent
+            key(index) {
+                val interactions = remember { MutableInteractionSource() }
+                val pressed by interactions.collectIsPressedAsState()
+                val scale by animateFloatAsState(
+                    targetValue = if (pressed) 0.91f else if (selected == index) 1.04f else 1f,
+                    animationSpec = spring(dampingRatio = 0.65f, stiffness = 500f),
+                    label = "glassTabPress"
+                )
+                val isSelected = selected == index
+                val glassModifier = if (isSelected) {
+                    Modifier.drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RoundedCornerShape(25.dp) },
+                        effects = {
+                            vibrancy()
+                            blur(4.dp.toPx())
+                            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                lens(9.dp.toPx(), 14.dp.toPx())
+                            }
+                        },
+                        onDrawSurface = { drawRect(Color(0xB8EAF0FF)) }
+                    ).border(1.dp, Color.White.copy(alpha = .9f), RoundedCornerShape(25.dp))
+                } else Modifier
+                Column(
+                    Modifier.weight(1f)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                        .then(glassModifier)
+                        .clip(RoundedCornerShape(25.dp))
+                        .clickable(
+                            interactionSource = interactions,
+                            indication = null
+                        ) { onSelected(index) }
+                        .padding(vertical = 9.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Icon(
+                        icons[index], contentDescription = label,
+                        tint = if (isSelected) Blue else Slate,
+                        modifier = Modifier.size(22.dp)
                     )
-                    .clickable { onSelected(index) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Icon(icons[index], contentDescription = label,
-                    tint = if (selected == index) Blue else Slate,
-                    modifier = Modifier.size(22.dp))
-                Text(label, fontWeight = if (selected == index) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected == index) Blue else Slate,
-                    style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        label,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) Blue else Slate,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
         }
     }
