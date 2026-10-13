@@ -453,7 +453,7 @@ private fun ApiDetailsScreen(
                     Text("响应 Body", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                     TextButton(onClick = { clipboard.setText(AnnotatedString(r.content)) }) { Text("复制响应") }
                 }
-                JsonPanel(r.content)
+                SmartApiResult(r.content)
             }
         }
     }
