@@ -339,6 +339,40 @@ private fun Modifier.drawBackdropIfAvailable(
     )
 }
 
+/** Shared premium glass panel for key summaries, not every scrolling list row. */
+@Composable
+fun LiquidGlassPanel(
+    modifier: Modifier = Modifier,
+    radius: Dp = 25.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val backdrop = LocalGlassBackdrop.current
+    val shape = RoundedCornerShape(radius)
+    Column(
+        modifier
+            .then(if (backdrop == null) {
+                Modifier.background(Color(0xEAFBFCFF), shape)
+            } else {
+                Modifier.drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { shape },
+                    effects = {
+                        vibrancy()
+                        blur(9.dp.toPx())
+                        lens(13.dp.toPx(), 17.dp.toPx())
+                    },
+                    highlight = { Highlight.Default.copy(alpha = .33f) },
+                    shadow = { Shadow(radius = 9.dp, alpha = .25f) },
+                    onDrawSurface = { drawRect(Color(0xBFFAFBFF)) }
+                )
+            })
+            .border(1.dp, Color.White.copy(alpha = .88f), shape)
+            .padding(17.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        content = content
+    )
+}
+
 /** Compact translucent toolbar; not part of the recorded page backdrop. */
 @Composable
 fun LiquidTopBar(
