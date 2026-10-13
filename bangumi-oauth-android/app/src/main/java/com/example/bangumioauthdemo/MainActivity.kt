@@ -37,8 +37,8 @@ class MainActivity : ComponentActivity() {
         OAuthSessionManager.initialize(application)
         if (OAuthSessionManager.session.value != null) RefreshScheduler.schedule(application)
         setContent {
-            MaterialTheme {
-                AppShell(oauth, explorer, ::openUrl)
+            GlassTheme {
+                BangumiApp(oauth, explorer, ::openUrl)
             }
         }
         oauth.callback(intent?.data)
@@ -502,4 +502,14 @@ private fun HistoryScreen(vm: ApiExplorerViewModel) {
             }
         }
     }
+}
+
+
+@Composable
+fun DeveloperGateway(
+    oauth: OAuthViewModel,
+    explorer: ApiExplorerViewModel,
+    openUrl: (String) -> Unit
+) {
+    AppShell(oauth, explorer, openUrl)
 }
