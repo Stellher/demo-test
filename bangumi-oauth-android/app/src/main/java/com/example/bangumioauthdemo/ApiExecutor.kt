@@ -79,8 +79,13 @@ class ApiExecutor {
                     error("JSON 请求体格式不正确：" + e.message)
                 }
             }
-            bodyInput.toRequestBody((if (mediaType.isBlank()) "application/json" else mediaType)
-                .toMediaType())
+            val requestedMedia = mediaType.ifBlank { BangumiJsonRequestBodies.CONTENT_TYPE }
+            if (requestedMedia == BangumiJsonRequestBodies.CONTENT_TYPE) {
+                req.header("Content-Type", BangumiJsonRequestBodies.CONTENT_TYPE)
+                BangumiJsonRequestBodies.encode(bodyInput)
+            } else {
+                bodyInput.toByteArray(Charsets.UTF_8).toRequestBody(requestedMedia.toMediaType())
+            }
         } else if (hasBody && endpoint.requestBody!!.required) {
             error("该 API 的请求体是必填项")
         } else {
