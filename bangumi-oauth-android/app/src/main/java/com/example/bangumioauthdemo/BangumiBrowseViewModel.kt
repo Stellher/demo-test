@@ -64,6 +64,9 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var seasonQuarter by mutableStateOf((LocalDate.now().monthValue - 1) / 3 + 1)
         private set
+    var seasonCategory by mutableStateOf<Int?>(1)
+        private set
+    private var seasonLoadId = 0
     var selectedCollectionType by mutableStateOf<Int?>(null)
         private set
 
@@ -104,18 +107,31 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         loadSeason(force = true)
     }
 
+    fun selectSeasonCategory(animeCategory: Int?) {
+        require(animeCategory in listOf(null, 0, 1, 2, 3, 5))
+        if (seasonCategory == animeCategory) return
+        seasonCategory = animeCategory
+        loadSeason(force = true)
+    }
+
     fun loadSeason(force: Boolean = false) {
         if ((seasonal.data != null || seasonal.loading) && !force) return
         val year = seasonYear
         val quarter = seasonQuarter
+        val cat = seasonCategory
+        val requestId = ++seasonLoadId
         seasonal = Resource(loading = true)
         viewModelScope.launch {
             try {
-                val result = repo.season(year, quarter)
-                if (seasonYear == year && seasonQuarter == quarter) {
+                val result = repo.season(year, quarter, cat)
+                if (requestId == seasonLoadId) {
                     seasonal = Resource(data = result)
                 }
-            } catch (e: Exception) { seasonal = Resource(error = e.message ?: "季度新番加载失败") }
+            } catch (e: Exception) {
+                if (requestId == seasonLoadId) {
+                    seasonal = Resource(error = e.message ?: "季度动画加载失败")
+                }
+            }
         }
     }
 
