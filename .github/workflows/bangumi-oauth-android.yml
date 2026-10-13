@@ -47,3 +47,12 @@ jobs:
           name: bangumi-glass-client-release-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
+      - name: Package Android Studio source
+        run: |
+          zip -qr bangumi-glass-source.zip bangumi-oauth-android \
+            -x "*/build/*" "*/.gradle/*"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bangumi-glass-android-studio-source
+          path: bangumi-glass-source.zip
+          retention-days: 7
