@@ -68,25 +68,36 @@ class ApiExecutor {
         }
         val method = endpoint.method
         val hasBody = endpoint.requestBody != null
+        val contentType = endpoint.requestBody?.mediaType.orEmpty()
+            .ifBlank { BangumiJsonRequests.CONTENT_TYPE }
+        val isJson = contentType.equals("application/json", ignoreCase = true)
         val requestBody = if (method in setOf("GET", "HEAD")) {
             null
         } else if (hasBody && bodyInput.isNotBlank()) {
-            val mediaType = endpoint.requestBody!!.mediaType
-            if (mediaType == "application/json") {
+            if (isJson) {
                 try {
-                    if (bodyInput.trim().startsWith("[")) JSONArray(bodyInput) else JSONObject(bodyInput)
+                    if (bodyInput.trim().startsWith("[")) JSONArray(bodyInput)
+                    else JSONObject(bodyInput)
                 } catch (e: Exception) {
                     error("JSON 请求体格式不正确：" + e.message)
                 }
             }
-            bodyInput.toRequestBody((if (mediaType.isBlank()) "application/json" else mediaType)
-                .toMediaType())
+            // String.toRequestBody() may append a charset parameter to Content-Type.
+            if (isJson) BangumiJsonRequests.body(bodyInput)
+            else bodyInput.toByteArray(Charsets.UTF_8).toRequestBody(contentType.toMediaType())
         } else if (hasBody && endpoint.requestBody!!.required) {
             error("该 API 的请求体是必填项")
         } else {
-            ByteArray(0).toRequestBody(null)
+            ByteArray(0).toRequestBody(
+                if (hasBody && isJson) BangumiJsonRequests.CONTENT_TYPE.toMediaType()
+                else null
+            )
         }
         req.method(method, requestBody)
+        // Official Bangumi JSON endpoints expect precisely "application/json".
+        if (method !in setOf("GET", "HEAD") && hasBody && isJson) {
+            req.header("Content-Type", BangumiJsonRequests.CONTENT_TYPE)
+        }
         val request = req.build()
         val t0 = System.nanoTime()
         client.newCall(request).execute().use { response ->
