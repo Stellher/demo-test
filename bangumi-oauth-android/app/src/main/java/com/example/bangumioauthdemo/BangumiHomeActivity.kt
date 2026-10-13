@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.lifecycleScope
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -82,12 +83,14 @@ private fun BangumiHomeApp(
     }
 
     Box(Modifier.fillMaxSize()) {
-        GlassBackdropBackground()
+        // Capture BOTH the decorative background and the live scrollable content.
+        // Without this, real refraction samples transparent pixels.
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
         Box(
-            Modifier.fillMaxSize()
-                .layerBackdrop(backdrop)
-                .statusBarsPadding()
+            Modifier.fillMaxSize().layerBackdrop(backdrop)
         ) {
+            GlassBackdropBackground()
+            Box(Modifier.fillMaxSize().statusBarsPadding()) {
             when {
                 person != null -> PersonPage(vm, back = { vm.closePerson() })
                 subject != null -> SubjectPage(
@@ -122,6 +125,7 @@ private fun BangumiHomeApp(
                     )
                 }
             }
+            }
         }
         if (!overlay) {
             LiquidNavigation(
@@ -134,5 +138,6 @@ private fun BangumiHomeApp(
         }
         SnackbarHost(snackHost, modifier = Modifier.align(Alignment.BottomCenter)
             .navigationBarsPadding().padding(bottom = if (overlay) 10.dp else 94.dp))
+        }
     }
 }
