@@ -48,7 +48,7 @@ val GlassTypography = Typography(
         color = G.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp
     ),
     headlineMedium = androidx.compose.ui.text.TextStyle(
-        color = G.ink, fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.6).sp
+        color = G.ink, fontSize = 26.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.6).sp
     ),
     titleLarge = androidx.compose.ui.text.TextStyle(
         color = G.ink, fontSize = 21.sp, fontWeight = FontWeight.SemiBold
