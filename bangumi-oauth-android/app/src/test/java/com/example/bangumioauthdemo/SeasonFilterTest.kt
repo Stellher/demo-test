@@ -27,6 +27,30 @@ class SeasonFilterTest {
     }
 
     @Test
+    fun officialSubjectResponsesWithoutCatStayVisible() {
+        val noCatTv = AnimeCard(
+            id = 200, title = "TV series", category = 2,
+            platform = "TV", date = "2026-10-14"
+        )
+        val noCatUnknownPlatform = AnimeCard(
+            id = 201, title = "Unknown platform", category = 2,
+            date = "2026-11-01"
+        )
+        val noCatMovie = AnimeCard(
+            id = 202, title = "Film", category = 2,
+            platform = "剧场版", date = "2026-12-01"
+        )
+        val noCatGame = AnimeCard(
+            id = 203, title = "Game", category = 4,
+            date = "2026-11-01"
+        )
+        val candidates = listOf(noCatTv, noCatUnknownPlatform, noCatMovie, noCatGame)
+        assertEquals(listOf(200, 201), SeasonFilter.apply(candidates, 2026, 4, 1).map { it.id })
+        assertEquals(listOf(200, 201, 202), SeasonFilter.apply(candidates, 2026, 4, null).map { it.id })
+        assertEquals(listOf(202), SeasonFilter.apply(candidates, 2026, 4, 3).map { it.id })
+    }
+
+    @Test
     fun monthsAreQuarterBounded() {
         assertEquals(1..3, SeasonFilter.quarterMonths(1))
         assertEquals(4..6, SeasonFilter.quarterMonths(2))
