@@ -3,10 +3,7 @@ package com.example.bangumioauthdemo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -22,8 +19,6 @@ class BangumiRepository {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
-    private val userAgent = "BangumiGlass/1.0 (Android; github.com/Stellher/demo-test)"
 
     private suspend fun request(
         path: String,
@@ -44,16 +39,13 @@ class BangumiRepository {
             error("此操作需要登录 Bangumi，请在「我的」页面授权。")
         }
         fun execute(accessToken: String?): Pair<Int, String> {
-            val requestBuilder = Request.Builder()
-                .url(url)
-                .header("User-Agent", userAgent)
-                .header("Accept", "application/json")
-            if (!accessToken.isNullOrBlank()) requestBuilder
-                .header("Authorization", "Bearer " + accessToken)
-            val requestBody = if (method == "GET") null
-            else (body?.toString() ?: "").toRequestBody(jsonMedia)
-            requestBuilder.method(method, requestBody)
-            return http.newCall(requestBuilder.build()).execute().use { response ->
+            val request = BangumiRequestFactory.create(
+                url = url,
+                method = method,
+                payload = body?.toString(),
+                accessToken = accessToken
+            )
+            return http.newCall(request).execute().use { response ->
                 response.code to response.body?.string().orEmpty()
             }
         }
