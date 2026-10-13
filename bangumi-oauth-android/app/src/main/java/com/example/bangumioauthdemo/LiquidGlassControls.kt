@@ -61,6 +61,7 @@ fun GlassPill(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
+    compact: Boolean = false,
     onClick: () -> Unit,
     content: @Composable RowScope.() -> Unit
 ) {
@@ -126,7 +127,7 @@ fun GlassPill(
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         }
-        .padding(horizontal = 15.dp, vertical = 9.dp)
+        .padding(horizontal = if (compact) 9.dp else 15.dp, vertical = 9.dp)
     Row(
         base,
         verticalAlignment = Alignment.CenterVertically,
@@ -144,6 +145,7 @@ fun GlassIconAction(
 ) {
     GlassPill(
         modifier = modifier.size(46.dp).semantics { contentDescription = description },
+        compact = true,
         onClick = onClick
     ) {
         Icon(icon, contentDescription = description, tint = Ink, modifier = Modifier.size(22.dp))
