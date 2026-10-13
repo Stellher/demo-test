@@ -67,6 +67,7 @@ import kotlin.math.roundToInt
  * backdrop capture can cause RenderThread crashes.
  */
 val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalAnimePreviewHandler = staticCompositionLocalOf<((AnimeCard) -> Unit)?> { null }
 
 @Composable
 fun LiquidAction(
@@ -382,22 +383,52 @@ fun LiquidTopBar(
     actions: @Composable RowScope.() -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val backdrop = LocalGlassBackdrop.current
+    val barBackdrop = rememberLayerBackdrop()
+    val glassShape = RoundedCornerShape(30.dp)
+    val shell = if (backdrop == null) {
+        Modifier.background(Color(0xE6FFFFFF), glassShape)
+    } else {
+        Modifier.drawBackdrop(
+            backdrop = backdrop,
+            exportedBackdrop = barBackdrop,
+            shape = { glassShape },
+            effects = {
+                vibrancy()
+                blur(10.dp.toPx())
+                lens(16.dp.toPx(), 19.dp.toPx())
+            },
+            highlight = { Highlight.Default.copy(alpha = .42f) },
+            shadow = { Shadow(radius = 9.dp, alpha = .20f) },
+            onDrawSurface = { drawRect(Color(0x9CF8FAFF)) }
+        )
+    }
     Row(
-        modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+        modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .shadow(8.dp, glassShape)
+            .then(shell)
+            .border(1.dp, Color.White.copy(.9f), glassShape)
+            .padding(horizontal = 13.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (leadingIcon != null && onLeading != null) {
-            LiquidIconAction(leadingIcon, "返回", onLeading)
-        } else {
-            Box(Modifier.size(11.dp).clip(RoundedCornerShape(50))
-                .background(Blue))
+        val composite = if (backdrop != null) {
+            rememberCombinedBackdrop(backdrop, barBackdrop)
+        } else null
+        CompositionLocalProvider(LocalGlassBackdrop provides composite) {
+            if (leadingIcon != null && onLeading != null) {
+                LiquidIconAction(leadingIcon, "返回", onLeading, modifier = Modifier.size(38.dp))
+            } else {
+                Box(Modifier.size(10.dp).clip(RoundedCornerShape(50))
+                    .background(Blue))
+            }
+            Text(
+                title, Modifier.weight(1f), fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium, color = Ink, maxLines = 1
+            )
+            actions()
         }
-        Text(title, Modifier.weight(1f),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleMedium, color = Ink,
-            maxLines = 1)
-        actions()
     }
 }
 
