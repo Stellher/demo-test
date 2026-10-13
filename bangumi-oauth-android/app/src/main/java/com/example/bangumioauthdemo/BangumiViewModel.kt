@@ -1,5 +1,7 @@
 package com.example.bangumioauthdemo
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
