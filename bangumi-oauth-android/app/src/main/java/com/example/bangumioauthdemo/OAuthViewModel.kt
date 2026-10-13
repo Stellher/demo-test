@@ -10,32 +10,36 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.security.SecureRandom
 
-data class OAuthSession(
-    val accessToken: String,
-    val refreshToken: String,
-    val tokenType: String,
-    val scope: String,
-    val userId: String,
-    val expiresIn: Long,
-    val expiresAtMillis: Long,
-    val raw: String
-)
-
-class OAuthViewModel(app: Application) : AndroidViewModel(app) {
+class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("oauth_demo", 0)
     private val _output = MutableStateFlow("授权后将在这里显示 OAuth 返回的所有字段。")
     val output = _output.asStateFlow()
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
-    private val _clientSecret = MutableStateFlow(prefs.getString("client_secret", "").orEmpty())
-    val clientSecret = _clientSecret.asStateFlow()
-    private val _session = MutableStateFlow<OAuthSession?>(null)
-    val session = _session.asStateFlow()
+
+    val clientSecret = OAuthSessionManager.secret
+    val session = OAuthSessionManager.session
+    val refreshState = OAuthSessionManager.refreshState
     private var pendingState: String? = prefs.getString("pending_state", null)
 
+    init {
+        OAuthSessionManager.initialize(app)
+        if (OAuthSessionManager.session.value != null) {
+            _output.value = "已从设备加密存储恢复 OAuth 授权。正在自动检查 Token…"
+            viewModelScope.launch {
+                OAuthSessionManager.ensureValidToken()
+                val state = OAuthSessionManager.refreshState.value
+                _output.value = "自动登录检查完成：${state.message}\n请打开「全部 API」继续使用。"
+            }
+        }
+    }
+
     fun updateClientSecret(secret: String) {
-        _clientSecret.value = secret
-        prefs.edit().putString("client_secret", secret).apply()
+        try {
+            OAuthSessionManager.updateSecret(secret)
+        } catch (_: Exception) {
+            _output.value = "保存 App Secret 失败，请检查设备密钥与存储。"
+        }
     }
 
     fun beginLogin(): String {
@@ -69,67 +73,88 @@ class OAuthViewModel(app: Application) : AndroidViewModel(app) {
         pendingState = null
         prefs.edit().remove("pending_state").apply()
         _output.value = "Authorization Code:\n" + code + "\n\n正在交换 Access Token…"
-        exchange(code)
+        launchOperation(
+            action = { OAuthRepository.exchange(code, OAuthSessionManager.secret.value) },
+            updatesTokens = true
+        )
     }
 
-    private fun launchOperation(action: suspend () -> JSONObject, updatesTokens: Boolean = false) {
+    private fun launchOperation(
+        action: suspend () -> JSONObject,
+        updatesTokens: Boolean = false
+    ) {
         if (_busy.value) return
         _busy.value = true
         viewModelScope.launch {
             try {
                 val result = action()
                 if (updatesTokens) {
-                    val token = result.optString("access_token")
-                    if (token.isBlank()) error("Token 接口未返回 access_token: " + result)
-                    val old = _session.value
-                    val expires = result.optLong("expires_in", 0)
-                    _session.value = OAuthSession(
-                        accessToken = token,
-                        refreshToken = result.optString("refresh_token").ifBlank { old?.refreshToken.orEmpty() },
-                        tokenType = result.optString("token_type", "Bearer"),
-                        scope = result.optString("scope", "null"),
-                        userId = result.optString("user_id").ifBlank { old?.userId.orEmpty() },
-                        expiresIn = expires,
-                        expiresAtMillis = System.currentTimeMillis() + expires * 1000L,
-                        raw = result.toString(2)
-                    )
+                    OAuthSessionManager.acceptTokenResponse(result)
+                    RefreshScheduler.schedule(app)
                 }
                 _output.value = result.toString(2)
             } catch (e: Exception) {
-                _output.value = "请求失败：" + e.message
+                _output.value = "请求失败：" + (e.message ?: e.javaClass.simpleName)
             } finally {
                 _busy.value = false
             }
         }
     }
 
-    private fun exchange(code: String) {
-        launchOperation({ OAuthRepository.exchange(code, _clientSecret.value) }, updatesTokens = true)
-    }
-
     fun refresh() {
-        val token = _session.value?.refreshToken.orEmpty()
-        if (token.isBlank()) { _output.value = "没有 Refresh Token，请先登录"; return }
-        launchOperation({ OAuthRepository.refresh(token, _clientSecret.value) }, updatesTokens = true)
+        if (_busy.value) return
+        if (session.value == null) {
+            _output.value = "没有保存的 OAuth Token，请先登录"
+            return
+        }
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                val token = OAuthSessionManager.ensureValidToken(forceRefresh = true)
+                _output.value = if (token != null && refreshState.value.kind == "REFRESHED") {
+                    session.value?.raw.orEmpty()
+                } else {
+                    "刷新未成功：${refreshState.value.message}"
+                }
+            } catch (e: Exception) {
+                _output.value = "刷新异常：" + (e.message ?: "未知错误")
+            } finally {
+                _busy.value = false
+            }
+        }
     }
 
     fun status() {
-        val token = _session.value?.accessToken.orEmpty()
-        if (token.isBlank()) { _output.value = "没有 Access Token，请先登录"; return }
-        launchOperation({ OAuthRepository.status(token) })
+        launchOperation({
+            val token = OAuthSessionManager.ensureValidToken()
+                ?: error("无法获取有效的 Access Token，请检查授权状态")
+            OAuthRepository.status(token)
+        })
     }
 
     fun me() {
-        val token = _session.value?.accessToken.orEmpty()
-        if (token.isBlank()) { _output.value = "没有 Access Token，请先登录"; return }
-        launchOperation({ OAuthRepository.me(token) })
+        launchOperation({
+            val token = OAuthSessionManager.ensureValidToken()
+                ?: error("无法获取有效的 Access Token，请检查授权状态")
+            OAuthRepository.me(token)
+        })
     }
 
     fun clear() {
-        _session.value = null
-        pendingState = null
-        prefs.edit().remove("pending_state").remove("client_secret").apply()
-        _clientSecret.value = ""
-        _output.value = "已清除 Access Token、Refresh Token 和保存在本机的 App Secret。"
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                OAuthSessionManager.clearAll()
+                RefreshScheduler.cancel(app)
+                pendingState = null
+                prefs.edit().remove("pending_state").apply()
+                _output.value = "已安全清除本机 Access Token、Refresh Token 与 App Secret。"
+            } catch (_: Exception) {
+                _output.value = "清除授权失败，请检查设备存储。"
+            } finally {
+                _busy.value = false
+            }
+        }
     }
 }
