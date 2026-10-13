@@ -103,7 +103,7 @@ class BangumiRepository {
      * This list is a release-quarter catalogue, not an editorially curated
      * TV-only new-anime schedule (movies/OVAs may still be included).
      */
-    suspend fun season(year: Int, quarter: Int): List<AnimeCard> {
+    suspend fun season(year: Int, quarter: Int, animeCategory: Int = 1): List<AnimeCard> {
         val selected = quarter.coerceIn(1, 4)
         val startMonth = (selected - 1) * 3 + 1
         val firstDay = LocalDate.of(year, startMonth, 1)
@@ -118,14 +118,15 @@ class BangumiRepository {
             var pageIndex = 0
             while (pageIndex < 4) {
                 try {
-                    val page = objectResponse("/v0/subjects", mapOf(
-                        "type" to "2",
-                        "year" to year.toString(),
-                        "month" to month.toString(),
-                        "sort" to "date",
-                        "limit" to "60",
-                        "offset" to offset.toString()
-                    )).pageData()
+                    val page = objectResponse("/v0/subjects", buildMap {
+                        put("type", "2")
+                        if (animeCategory != 0) put("cat", animeCategory.toString())
+                        put("year", year.toString())
+                        put("month", month.toString())
+                        put("sort", "date")
+                        put("limit", "60")
+                        put("offset", offset.toString())
+                    }).pageData()
                     success++
                     page.forEach { raw ->
                         // Check the raw API type before mapping, since card()
@@ -135,7 +136,15 @@ class BangumiRepository {
                         val releaseDate = runCatching {
                             LocalDate.parse(item.date.take(10))
                         }.getOrNull()
-                        if (item.id > 0 && releaseDate != null &&
+                        val platform = raw.optString("platform", "").trim().lowercase()
+                        val categoryMatches = when (animeCategory) {
+                            1 -> platform == "tv"
+                            2 -> platform == "ova"
+                            3 -> platform in setOf("movie", "剧场版")
+                            5 -> platform in setOf("web", "web animation", "网络动画")
+                            else -> true
+                        }
+                        if (item.id > 0 && releaseDate != null && categoryMatches &&
                             !releaseDate.isBefore(firstDay) &&
                             releaseDate.isBefore(lastDayExclusive)
                         ) {
