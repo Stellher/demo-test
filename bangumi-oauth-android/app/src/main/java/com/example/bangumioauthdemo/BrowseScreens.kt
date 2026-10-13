@@ -168,19 +168,25 @@ private fun QuickAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier.clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = .82f))
-            .border(1.dp, Line, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick).padding(15.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassPanel(
+        modifier = modifier.clickable(onClick = onClick),
+        radius = 22.dp,
+        tint = Color(0xA6FFFFFF)
     ) {
-        Text(emoji, style = MaterialTheme.typography.headlineSmall)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, color = Ink,
-                style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, color = Slate, style = MaterialTheme.typography.labelSmall)
+        Row(
+            Modifier.fillMaxWidth().padding(15.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(emoji, style = MaterialTheme.typography.headlineSmall)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, fontWeight = FontWeight.Bold, color = Ink,
+                    style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, color = Slate, style = MaterialTheme.typography.labelSmall)
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null,
+                tint = Blue, modifier = Modifier.size(18.dp))
         }
     }
 }
