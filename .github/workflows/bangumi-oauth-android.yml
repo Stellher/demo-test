@@ -2,7 +2,7 @@ name: Bangumi Glass Full Client Release
 on:
   push:
     branches:
-      - build/bangumi-glass-client-20261014
+      - build/bangumi-glass-integrated-20261014
   pull_request:
     branches:
       - main
