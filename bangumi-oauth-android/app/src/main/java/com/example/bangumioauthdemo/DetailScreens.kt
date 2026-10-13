@@ -45,9 +45,10 @@ fun SubjectPage(
             LiquidIconAction(Icons.Outlined.ArrowBack, "返回", back)
             Text("作品详情", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
-            LiquidIconAction(Icons.Outlined.Refresh, "刷新条目") {
-                vm.selectedSubject?.let { vm.loadSubject(it) }
-            }
+            LiquidIconAction(
+                Icons.Outlined.Refresh, "刷新条目",
+                onClick = { vm.selectedSubject?.let { vm.loadSubject(it) } }
+            )
         }
         val data = loaded.data
         if (data == null) {
