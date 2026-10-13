@@ -100,7 +100,8 @@ private fun BangumiHomeApp(
                 searchOpen -> SearchPage(
                     vm = vm,
                     onBack = { searchOpen = false },
-                    openSubject = vm::openSubject
+                    openSubject = vm::openSubject,
+                    openPerson = vm::openPerson
                 )
                 else -> when (currentTab) {
                     0 -> DiscoverPage(
