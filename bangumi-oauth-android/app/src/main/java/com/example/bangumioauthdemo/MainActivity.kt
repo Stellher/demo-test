@@ -37,8 +37,8 @@ class MainActivity : ComponentActivity() {
         OAuthSessionManager.initialize(application)
         if (OAuthSessionManager.session.value != null) RefreshScheduler.schedule(application)
         setContent {
-            GlassTheme {
-                BangumiApp(oauth, explorer, ::openUrl)
+            MaterialTheme {
+                AppShell(oauth, explorer, ::openUrl)
             }
         }
         oauth.callback(intent?.data)
@@ -453,7 +453,7 @@ private fun ApiDetailsScreen(
                     Text("响应 Body", modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                     TextButton(onClick = { clipboard.setText(AnnotatedString(r.content)) }) { Text("复制响应") }
                 }
-                SmartApiResult(r.content)
+                JsonPanel(r.content)
             }
         }
     }
@@ -502,14 +502,4 @@ private fun HistoryScreen(vm: ApiExplorerViewModel) {
             }
         }
     }
-}
-
-
-@Composable
-fun DeveloperGateway(
-    oauth: OAuthViewModel,
-    explorer: ApiExplorerViewModel,
-    openUrl: (String) -> Unit
-) {
-    AppShell(oauth, explorer, openUrl)
 }
