@@ -421,19 +421,19 @@ private fun DiscoverScreen(vm: BangumiViewModel) {
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                GlassTag("全部", vm.discoveryType == 0) { vm.setDiscoveryType(0) }
+                GlassTag("全部", selected = vm.discoveryType == 0, onClick = { vm.setDiscoveryType(0) })
                 typeItems.forEach { (type,name) ->
-                    GlassTag(name, vm.discoveryType == type) { vm.setDiscoveryType(type) }
+                    GlassTag(name, selected = vm.discoveryType == type, onClick = { vm.setDiscoveryType(type) })
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("结果 · ${vm.discoveryTotal} 项", Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium)
-                GlassTag("相关", vm.discoverySort == "match") { vm.setDiscoverySort("match") }
+                GlassTag("相关", selected = vm.discoverySort == "match", onClick = { vm.setDiscoverySort("match") })
                 Spacer(Modifier.width(7.dp))
-                GlassTag("评分", vm.discoverySort == "score") { vm.setDiscoverySort("score") }
+                GlassTag("评分", selected = vm.discoverySort == "score", onClick = { vm.setDiscoverySort("score") })
                 Spacer(Modifier.width(7.dp))
-                GlassTag("热度", vm.discoverySort == "heat") { vm.setDiscoverySort("heat") }
+                GlassTag("热度", selected = vm.discoverySort == "heat", onClick = { vm.setDiscoverySort("heat") })
             }
             ErrorInline(vm.notices["search"]) { vm.submitSearch() }
         }
