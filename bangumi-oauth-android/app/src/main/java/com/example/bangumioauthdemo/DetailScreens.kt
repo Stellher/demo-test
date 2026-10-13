@@ -79,7 +79,10 @@ fun SubjectPage(
                 if (item.original.isNotBlank() && item.original != item.title) {
                     Text(item.original, style = MaterialTheme.typography.bodySmall, color = Slate)
                 }
-                Text("动画 / 游戏 / 书籍 · Bangumi #" + item.id,
+                Text((when (item.category) {
+                    1 -> "书籍"; 2 -> "动画"; 3 -> "音乐"; 4 -> "游戏"; 6 -> "三次元"
+                    else -> "条目"
+                }) + " · Bangumi #" + item.id,
                     style = MaterialTheme.typography.labelSmall, color = Slate)
                 if (item.date.isNotBlank()) Text("放送 / 发售：" + item.date,
                     style = MaterialTheme.typography.bodySmall, color = Slate)
@@ -87,29 +90,31 @@ fun SubjectPage(
                     style = MaterialTheme.typography.labelMedium, color = Blue)
             }
         }
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                .background(Color.White.copy(alpha = .8f)).padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Metric("综合评分", if (item.score > 0) String.format("%.1f", item.score) else "—", "★")
-            Metric("排名", if (item.rank > 0) "#" + item.rank else "—", "↗")
-            Metric("收藏", if (item.collectionCount > 0) item.collectionCount.toString() else "—", "♡")
+        GlassPanel(Modifier.fillMaxWidth(), radius = 24.dp, tint = Color(0xAAFFFFFF)) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 18.dp, horizontal = 10.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Metric("综合评分", if (item.score > 0) String.format("%.1f", item.score) else "—", "★")
+                Metric("排名", if (item.rank > 0) "#" + item.rank else "—", "↗")
+                Metric("收藏", if (item.collectionCount > 0) item.collectionCount.toString() else "—", "♡")
+            }
         }
         if (session == null) {
-            Button(onClick = openLogin, modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)) {
-                Icon(Icons.Outlined.Login, null)
-                Spacer(Modifier.width(9.dp))
-                Text("登录后管理收藏与观看进度")
-            }
+            GlassAction(
+                text = "登录后管理收藏与观看进度",
+                onClick = openLogin,
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Outlined.Login
+            )
         } else {
-            Button(onClick = { editing = true }, modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)) {
-                Icon(Icons.Outlined.Edit, null)
-                Spacer(Modifier.width(9.dp))
-                Text(if (data.collection == null) "加入我的收藏" else "编辑收藏 · 评分 · 标签 · 评论")
-            }
+            GlassAction(
+                text = if (data.collection == null) "加入我的收藏" else "编辑收藏 · 评分 · 标签 · 评论",
+                onClick = { editing = true },
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Outlined.Edit,
+                active = true
+            )
         }
         Hairline()
         SectionTitle("作品简介")
@@ -317,11 +322,13 @@ private fun CollectionEditor(
             Column(Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(13.dp)) {
                 Text("收藏状态", style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    types.forEachIndexed { i, text ->
-                        SoftChip(text, selected = collectionType == i + 1) {
-                            collectionType = i + 1
+                CompositionLocalProvider(LocalGlassBackdrop provides null) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        types.forEachIndexed { i, text ->
+                            SoftChip(text, selected = collectionType == i + 1) {
+                                collectionType = i + 1
+                            }
                         }
                     }
                 }
