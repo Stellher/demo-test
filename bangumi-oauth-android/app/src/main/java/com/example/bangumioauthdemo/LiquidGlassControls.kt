@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -101,14 +103,20 @@ fun GlassPill(
                 },
                 onDrawSurface = {
                     drawRect(
-                        if (selected) Color(0xCDE8EDFF) else GlassWhite,
+                        if (selected) Color(0x9CE8EDFF) else GlassWhite,
                         blendMode = BlendMode.SrcOver
                     )
-                    if (pressed) drawRect(Color.White.copy(alpha = .10f), BlendMode.Plus)
+                    if (pressed) drawRect(Color.White.copy(alpha = .10f), blendMode = BlendMode.Plus)
                 }
             )
         } else Modifier)
-        .then(if (backdrop == null) Modifier else Modifier)
+        .then(
+            if (backdrop == null) {
+                Modifier.background(
+                    if (selected) Color(0xFFE7EDFF) else Color(0xEBFFFFFF), Capsule
+                ).border(1.dp, Color(0xFFC6CCDC), Capsule)
+            } else Modifier
+        )
         .clickable(
             enabled = enabled,
             interactionSource = interaction,
