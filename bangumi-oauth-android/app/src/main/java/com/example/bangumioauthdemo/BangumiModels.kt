@@ -14,7 +14,8 @@ data class AnimeCard(
     val score: Double = 0.0,
     val rank: Int = 0,
     val collectionCount: Int = 0,
-    val category: Int = 2
+    val category: Int = 2,
+    val subCategory: Int = 0
 )
 
 data class BroadcastDay(val day: Int, val title: String, val entries: List<AnimeCard>)
@@ -46,7 +47,9 @@ fun JSONObject.card(): AnimeCard {
         score = rating.optDouble("score", 0.0),
         rank = optInt("rank"),
         collectionCount = obj("collection").optInt("collect"),
-        category = optInt("type", 2)
+        // Never silently treat a missing subject type as anime.
+        category = optInt("type", 0),
+        subCategory = optInt("cat", 0)
     )
 }
 
