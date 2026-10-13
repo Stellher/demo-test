@@ -65,7 +65,8 @@ private fun BangumiHomeApp(
     vm: BangumiBrowseViewModel,
     openOAuthLab: () -> Unit
 ) {
-    val backdrop = rememberLayerBackdrop()
+    val backdrop = rememberLayerBackdrop()        // Composite entire page for the external dock
+    val controlsBackdrop = rememberLayerBackdrop() // Background-only for in-page controls
     val snackHost = remember { SnackbarHostState() }
     var currentTab by remember { mutableIntStateOf(0) }
     var searchOpen by remember { mutableStateOf(false) }
@@ -92,13 +93,14 @@ private fun BangumiHomeApp(
     }
 
     Box(Modifier.fillMaxSize()) {
-        // Capture BOTH the decorative background and the live scrollable content.
-        // Without this, real refraction samples transparent pixels.
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
-        Box(
-            Modifier.fillMaxSize().layerBackdrop(backdrop)
-        ) {
-            GlassBackdropBackground()
+        // Two independent sampling layers prevent glass -> itself RenderThread cycles.
+        // Local in-page glass samples only the decorative background.
+        // The external liquid dock samples the full rendered UI (including active lists).
+        CompositionLocalProvider(LocalGlassBackdrop provides controlsBackdrop) {
+        Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+            Box(Modifier.fillMaxSize().layerBackdrop(controlsBackdrop)) {
+                GlassBackdropBackground()
+            }
             Box(Modifier.fillMaxSize().statusBarsPadding()) {
             when {
                 person != null -> PersonPage(vm, back = { vm.closePerson() })
