@@ -95,27 +95,64 @@ class BangumiRepository {
             "offset" to offset.toString(), "limit" to limit.toString()
         )).pageData().map(JSONObject::card).filter { it.id > 0 }
 
+    /**
+     * The /v0/subjects API accepts type/year/month but can return unrelated
+     * entries when the catalogue is incomplete. Never trust request filters:
+     * validate each result's type AND actual release date.
+     *
+     * This list is a release-quarter catalogue, not an editorially curated
+     * TV-only new-anime schedule (movies/OVAs may still be included).
+     */
     suspend fun season(year: Int, quarter: Int): List<AnimeCard> {
         val selected = quarter.coerceIn(1, 4)
-        val months = (1..3).map { (selected - 1) * 3 + it }
-        val collected = mutableListOf<AnimeCard>()
+        val startMonth = (selected - 1) * 3 + 1
+        val firstDay = LocalDate.of(year, startMonth, 1)
+        val lastDayExclusive = firstDay.plusMonths(3)
+        val collected = LinkedHashMap<Int, AnimeCard>()
         var success = 0
         var firstFailure: Exception? = null
-        months.forEach { month ->
-            try {
-                val result = objectResponse("/v0/subjects", mapOf(
-                    "type" to "2", "year" to year.toString(),
-                    "month" to month.toString(), "sort" to "date",
-                    "limit" to "60", "offset" to "0"
-                )).pageData().map(JSONObject::card)
-                collected += result
-                success++
-            } catch (e: Exception) {
-                if (firstFailure == null) firstFailure = e
+
+        for (month in startMonth until startMonth + 3) {
+            var offset = 0
+            // Bounded pagination; do not silently present other quarters as new anime.
+            repeat(4) {
+                try {
+                    val page = objectResponse("/v0/subjects", mapOf(
+                        "type" to "2",
+                        "year" to year.toString(),
+                        "month" to month.toString(),
+                        "sort" to "date",
+                        "limit" to "60",
+                        "offset" to offset.toString()
+                    )).pageData()
+                    success++
+                    page.forEach { raw ->
+                        // Check the raw API type before mapping, since card()
+                        // supplies type=2 as a fallback when it is absent.
+                        if (raw.optInt("type", -1) != 2) return@forEach
+                        val item = raw.card()
+                        val releaseDate = runCatching {
+                            LocalDate.parse(item.date.take(10))
+                        }.getOrNull()
+                        if (item.id > 0 && releaseDate != null &&
+                            !releaseDate.isBefore(firstDay) &&
+                            releaseDate.isBefore(lastDayExclusive)
+                        ) {
+                            collected[item.id] = item
+                        }
+                    }
+                    offset += page.size
+                    if (page.size < 60) return@repeat
+                } catch (e: Exception) {
+                    if (firstFailure == null) firstFailure = e
+                    return@repeat
+                }
             }
         }
         if (success == 0) throw (firstFailure ?: IllegalStateException("季度数据获取失败"))
-        return collected.distinctBy { it.id }.sortedByDescending { it.date }
+        return collected.values.sortedWith(
+            compareBy<AnimeCard> { it.date }.thenBy { it.title }
+        )
     }
 
     suspend fun search(keyword: String, subjectType: Int? = null, offset: Int = 0): List<AnimeCard> {
