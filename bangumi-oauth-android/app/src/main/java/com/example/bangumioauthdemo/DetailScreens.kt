@@ -56,9 +56,11 @@ fun SubjectPage(
                 Text("作品档案", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, color = Ink)
             }
-            GlassIconAction(Icons.Outlined.Refresh, "刷新条目") {
-                vm.selectedSubject?.let { vm.loadSubject(it) }
-            }
+            GlassIconAction(
+                icon = Icons.Outlined.Refresh,
+                description = "刷新条目",
+                onClick = { vm.selectedSubject?.let { vm.loadSubject(it) } }
+            )
         }
         val data = loaded.data
         if (data == null) {
