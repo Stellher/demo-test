@@ -49,12 +49,10 @@ fun DiscoverPage(
     ) {
         item {
             PageTitle("ANIME DISCOVERY", "发现好作品", "每一天都值得期待一部好动画") {
-                IconButton(
-                    onClick = openSearch,
-                    modifier = Modifier.background(Color.White.copy(alpha = .85f), RoundedCornerShape(22.dp))
-                ) {
-                    Icon(Icons.Outlined.Search, "搜索 Bangumi", tint = Ink)
-                }
+                LiquidIconAction(
+                    Icons.Outlined.Search, "搜索 Bangumi",
+                    onClick = openSearch
+                )
             }
         }
         item {
@@ -201,16 +199,12 @@ fun CalendarPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
         item {
             PageTitle("ON AIR", "每日放送", "按照 Bangumi 官方放送日历浏览")
             Spacer(Modifier.height(18.dp))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                weekdays.forEachIndexed { idx, label ->
-                    val thisDay = idx + 1
-                    SoftChip(
-                        text = if (thisDay == LocalDate.now().dayOfWeek.value) label + " · 今" else label,
-                        selected = thisDay == day
-                    ) { day = thisDay }
-                }
-            }
+            LiquidSegmented(
+                titles = listOf("一", "二", "三", "四", "五", "六", "日"),
+                selectedIndex = day - 1,
+                onSelected = { day = it + 1 },
+                compact = true
+            )
         }
         item {
             SectionTitle(weekdays[day - 1] + "放送", "共 " + shows.size + " 部动画")
@@ -233,51 +227,109 @@ fun CalendarPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
 }
 
 @Composable
-fun SeasonPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
+fun SeasonPage(
+    vm: BangumiBrowseViewModel,
+    openSubject: (Int) -> Unit,
+    openFilters: () -> Unit
+) {
     LaunchedEffect(Unit) { vm.loadSeason() }
     val year = vm.seasonYear
     val quarter = vm.seasonQuarter
-    val r = vm.seasonal
-    val quarters = listOf("一月 · 冬番", "四月 · 春番", "七月 · 夏番", "十月 · 秋番")
-    LazyColumn(contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val resource = vm.seasonal
+    val quarterNames = listOf("冬 · 1月", "春 · 4月", "夏 · 7月", "秋 · 10月")
+    val categories = listOf(1 to "TV", 5 to "WEB", 2 to "OVA", 3 to "剧场", 0 to "全部")
+    val activeLabel = categories.firstOrNull { it.first == vm.seasonCategory }?.second ?: "TV"
+    LazyColumn(
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         item {
-            PageTitle("SEASONAL ARCHIVE", "季度新番", "通过 Bangumi 年份与月份筛选真实条目")
+            PageTitle(
+                eyebrow = "SEASONAL PREMIERES",
+                title = "本季新番",
+                subtitle = "严格筛选条目类型、首播日期与放送形式"
+            ) {
+                LiquidIconAction(
+                    Icons.Outlined.Tune, "高级筛选", onClick = openFilters
+                )
+            }
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { vm.selectSeason(year - 1, quarter) }) {
-                    Icon(Icons.Outlined.ChevronLeft, "上一年", tint = Ink)
+            LiquidGlassPanel(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    LiquidIconAction(
+                        Icons.Outlined.ChevronLeft, "上一年",
+                        onClick = { vm.selectSeason(year - 1, quarter) },
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("$year 年", style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold, color = Ink)
+                        Text("按放送年份检索", style = MaterialTheme.typography.labelSmall, color = Slate)
+                    }
+                    LiquidIconAction(
+                        Icons.Outlined.ChevronRight, "下一年",
+                        onClick = { vm.selectSeason(year + 1, quarter) },
+                        modifier = Modifier.size(40.dp)
+                    )
                 }
-                Text(year.toString() + " 年",
-                    style = MaterialTheme.typography.titleLarge,
+                LiquidSegmented(
+                    titles = quarterNames,
+                    selectedIndex = quarter - 1,
+                    onSelected = { vm.selectSeason(year, it + 1) },
+                    compact = true
+                )
+                Text("动画分类", style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold, color = Ink)
-                IconButton(onClick = { vm.selectSeason(year + 1, quarter) }) {
-                    Icon(Icons.Outlined.ChevronRight, "下一年", tint = Ink)
-                }
-            }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                quarters.forEachIndexed { i, label ->
-                    SoftChip(label, selected = quarter == i + 1) { vm.selectSeason(year, i + 1) }
-                }
+                LiquidSegmented(
+                    titles = categories.map { it.second },
+                    selectedIndex = categories.indexOfFirst { it.first == vm.seasonCategory }.coerceAtLeast(0),
+                    onSelected = { vm.selectSeasonCategory(categories[it].first) },
+                    compact = true
+                )
             }
         }
         item {
-            SectionTitle(quarters[quarter - 1], "包含当季三个月份的动画 · " + (r.data?.size ?: "…").toString() + " 部")
+            SectionTitle(
+                title = quarterNames[quarter - 1] + " · $activeLabel",
+                subtitle = "仅显示符合当前类型与季度的动画，共 ${resource.data?.size ?: "…"} 部",
+                action = "筛选"
+            ) { openFilters() }
         }
-        if (r.data == null) {
-            item { StatusMessage(r.loading, r.error, false) { vm.loadSeason(true) } }
+        if (resource.data == null) {
+            item {
+                StatusMessage(resource.loading, resource.error, false) {
+                    vm.loadSeason(force = true)
+                }
+            }
         } else {
-            val shows = r.data.orEmpty()
-            if (shows.isEmpty()) item { StatusMessage(false, null, true) }
+            val shows = resource.data.orEmpty()
+            if (shows.isEmpty()) item {
+                LiquidGlassPanel(Modifier.fillMaxWidth()) {
+                    Text("本季尚无符合条件的 $activeLabel 动画，试试「全部」或其他播出形式。",
+                        color = Slate, style = MaterialTheme.typography.bodyMedium)
+                    LiquidTextAction("切换筛选", onClick = openFilters)
+                }
+            }
             items(shows.chunked(2)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     row.forEach { item ->
-                        AnimePoster(item, modifier = Modifier.weight(1f)) { openSubject(item.id) }
+                        AnimePoster(item, modifier = Modifier.weight(1f)) {
+                            openSubject(item.id)
+                        }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
+        }
+        item {
+            Text(
+                "数据说明：TV / WEB / OVA / 剧场版由 Bangumi 官方分类筛选，并按首播日期复核。该列表不是人工编排的电视放送表。",
+                style = MaterialTheme.typography.labelSmall, color = Slate
+            )
         }
     }
 }
@@ -306,19 +358,19 @@ fun SearchPage(
     LazyColumn(contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(13.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Outlined.ArrowBack, "返回", tint = Ink) }
+                LiquidIconAction(Icons.Outlined.ArrowBack, "返回", onClick = onBack)
                 Text("搜索 Bangumi", style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold, color = Ink)
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                modes.forEachIndexed { index, label ->
-                    SoftChip(label, selected = mode == index) {
-                        mode = index
-                        if (query.isNotBlank()) submit()
-                    }
+            LiquidSegmented(
+                titles = modes,
+                selectedIndex = mode,
+                onSelected = {
+                    mode = it
+                    if (query.isNotBlank()) submit()
                 }
-            }
+            )
             Spacer(Modifier.height(11.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
