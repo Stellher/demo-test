@@ -280,39 +280,7 @@ fun LiquidDock(
                 onDrawSurface = { drawRect(Color(0xACFFFFFF)) }
             )
         )
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = padding, vertical = 7.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            titles.forEachIndexed { index, title ->
-                val isSelected = index == selected
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        if (index != selected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelected(index)
-                    },
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        icons[index], title,
-                        tint = if (isSelected) Blue else Slate,
-                        modifier = Modifier.size(if (isSelected) 24.dp else 22.dp)
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        title,
-                        color = if (isSelected) Blue else Slate,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            }
-        }
-        // The pill itself owns the long-press drag gesture; tapping other tabs remains direct.
+        // Draw the moving refractive capsule BEFORE icon labels so text stays sharp.
         Box(
             Modifier
                 .offset {
@@ -342,27 +310,62 @@ fun LiquidDock(
                     },
                     onDrawSurface = { drawRect(Color(0x42EDF3FF)) }
                 )
-                .pointerInput(tabWidthPx, selected) {
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            dragging = true
-                            dragIndex = selected.toFloat()
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        },
-                        onDragEnd = {
-                            val index = dragIndex.roundToInt().coerceIn(0, 4)
-                            dragging = false
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelected(index)
-                        },
-                        onDragCancel = { dragging = false },
-                        onDrag = { change, movement ->
-                            change.consume()
-                            dragIndex = (dragIndex + movement.x / tabWidthPx)
-                                .coerceIn(0f, 4f)
-                        }
+
+        )
+
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = padding, vertical = 7.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            titles.forEachIndexed { index, title ->
+                val isSelected = index == selected
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (index != selected) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSelected(index)
+                    }
+                    .then(if (isSelected) Modifier.pointerInput(tabWidthPx, selected) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                dragging = true
+                                dragIndex = selected.toFloat()
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDragEnd = {
+                                val next = dragIndex.roundToInt().coerceIn(0, 4)
+                                dragging = false
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelected(next)
+                            },
+                            onDragCancel = { dragging = false },
+                            onDrag = { change, movement ->
+                                change.consume()
+                                dragIndex = (dragIndex + movement.x / tabWidthPx)
+                                    .coerceIn(0f, 4f)
+                            }
+                        )
+                    } else Modifier),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        icons[index], title,
+                        tint = if (isSelected) Blue else Slate,
+                        modifier = Modifier.size(if (isSelected) 24.dp else 22.dp)
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        title,
+                        color = if (isSelected) Blue else Slate,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                     )
                 }
-        )
+            }
+        }
+
     }
 }
