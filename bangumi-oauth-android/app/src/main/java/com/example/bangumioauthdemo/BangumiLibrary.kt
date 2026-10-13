@@ -68,7 +68,7 @@ fun LibraryScreen(vm: BangumiViewModel, loggedIn: Boolean, onLogin: () -> Unit) 
             ) {
                 libraryTabs.forEach { (status, name) ->
                     GlassTag(name, selected = status == vm.collectionType,
-                        onClick = { vm.setCollectionType(status) })
+                        onClick = { vm.chooseCollectionType(status) })
                 }
             }
             Spacer(Modifier.height(18.dp))
