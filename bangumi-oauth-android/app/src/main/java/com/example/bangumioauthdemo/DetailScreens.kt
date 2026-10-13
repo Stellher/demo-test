@@ -22,6 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import org.json.JSONObject
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 
 @Composable
 fun SubjectPage(
@@ -45,14 +47,17 @@ fun SubjectPage(
             .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 114.dp),
         verticalArrangement = Arrangement.spacedBy(19.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back) {
-                Icon(Icons.Outlined.ArrowBack, "返回", tint = Ink)
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassIconAction(Icons.Outlined.ArrowBack, "返回", onClick = back)
+            Column(Modifier.weight(1f)) {
+                Text("SUBJECT ARCHIVE", style = MaterialTheme.typography.labelSmall,
+                    color = Blue, fontWeight = FontWeight.Bold)
+                Text("作品档案", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, color = Ink)
             }
-            Text("作品详情", style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
-            IconButton(onClick = { vm.selectedSubject?.let { vm.loadSubject(it) } }) {
-                Icon(Icons.Outlined.Refresh, "刷新条目", tint = Ink)
+            GlassIconAction(Icons.Outlined.Refresh, "刷新条目") {
+                vm.selectedSubject?.let { vm.loadSubject(it) }
             }
         }
         val data = loaded.data
@@ -64,30 +69,64 @@ fun SubjectPage(
         }
         val item = data.subject.card()
         val json = data.subject
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.width(125.dp).height(180.dp).clip(RoundedCornerShape(22.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFFB7C7E8), Blossom)))
-            ) {
-                AsyncImage(item.poster.replace("http://", "https://"), item.title,
-                    Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text(item.title, style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold, color = Ink)
-                if (item.original.isNotBlank() && item.original != item.title) {
-                    Text(item.original, style = MaterialTheme.typography.bodySmall, color = Slate)
+        val heroBackdrop = rememberLayerBackdrop()
+        val subjectKind = when (item.category) {
+            1 -> "BOOK"; 2 -> "ANIME"; 3 -> "MUSIC"; 4 -> "GAME"; 6 -> "LIVE ACTION"
+            else -> "SUBJECT"
+        }
+        Box(
+            Modifier.fillMaxWidth().height(296.dp)
+                .clip(RoundedCornerShape(29.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF8999BF), Color(0xFFCCADC9), Color(0xFF7487B3))
+                    )
+                )
+        ) {
+            // The artwork is captured separately, so the category badge can refract it safely.
+            Box(Modifier.fillMaxSize().layerBackdrop(heroBackdrop)) {
+                if (item.poster.isNotBlank()) {
+                    AsyncImage(
+                        model = item.poster.replace("http://", "https://"),
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                 }
-                Text((when (item.category) {
-                    1 -> "书籍"; 2 -> "动画"; 3 -> "音乐"; 4 -> "游戏"; 6 -> "三次元"
-                    else -> "条目"
-                }) + " · Bangumi #" + item.id,
-                    style = MaterialTheme.typography.labelSmall, color = Slate)
-                if (item.date.isNotBlank()) Text("放送 / 发售：" + item.date,
-                    style = MaterialTheme.typography.bodySmall, color = Slate)
-                if (item.rank > 0) Text("TOP #" + item.rank,
-                    style = MaterialTheme.typography.labelMedium, color = Blue)
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0f to Color(0x1B101928),
+                            .34f to Color(0x4210192A),
+                            1f to Color(0xE9081226)
+                        )
+                    )
+                )
+            }
+            CompositionLocalProvider(LocalGlassBackdrop provides heroBackdrop) {
+                Column(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(19.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    GlassPill(onClick = { vm.announce("Bangumi 条目 #${item.id}") }) {
+                        Text(subjectKind + "  ·  #${item.id}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Ink, fontWeight = FontWeight.Bold)
+                    }
+                    Text(item.title, style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis)
+                    if (item.original.isNotBlank() && item.original != item.title) {
+                        Text(item.original, color = Color.White.copy(alpha = .84f),
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    if (item.date.isNotBlank()) {
+                        Text("放送 / 发售  ·  " + item.date,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = .84f))
+                    }
+                }
             }
         }
         GlassPanel(Modifier.fillMaxWidth(), radius = 24.dp, tint = Color(0xAAFFFFFF)) {
