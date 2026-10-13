@@ -47,6 +47,8 @@ jobs:
           name: bangumi-glass-client-release-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
+      - name: Add Gradle wrapper to distributable source
+        run: gradle --no-daemon -p bangumi-oauth-android wrapper --gradle-version 8.11.1
       - name: Package Android Studio source
         run: |
           zip -qr bangumi-glass-source.zip bangumi-oauth-android \
