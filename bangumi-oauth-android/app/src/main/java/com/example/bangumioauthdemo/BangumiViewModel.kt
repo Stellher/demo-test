@@ -119,6 +119,13 @@ class BangumiViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun clearAccountData() {
+        profile = null
+        collections = emptyList()
+        collectionTotal = 0
+        progressIds = emptySet()
+    }
+
     fun changeTab(index: Int) {
         activeTab = index
         if (index == 3 && OAuthSessionManager.session.value != null) {
