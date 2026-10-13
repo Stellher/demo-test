@@ -3,6 +3,20 @@ package com.example.bangumioauthdemo
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.consume
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.Role
+import kotlin.math.roundToInt
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.Shadow
+import com.kyant.backdrop.shadow.InnerShadow
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.*
@@ -76,9 +90,11 @@ fun GlassBackdropBackground() {
 }
 
 /**
- * Kyant Backdrop navigation. The glass selection has its own lens and blur,
- * while the whole floating bar samples the page's backdrop. Press feedback
- * uses spring scaling and the pressed state from Compose interactions.
+ * Kyant-style floating navigation:
+ * - two non-recursive backdrop layers (track, tab icons)
+ * - movable refractive glass thumb with chromatic aberration
+ * - drag across tabs with haptic selection and spring interpolation
+ * - pressure/drag-dependent stretch handled IN drawBackdrop.layerBlock
  */
 @Composable
 fun LiquidNavigation(
@@ -95,72 +111,134 @@ fun LiquidNavigation(
         Icons.Outlined.BookmarkBorder,
         Icons.Outlined.PersonOutline
     )
-    Row(
-        modifier = modifier
-            .padding(horizontal = 15.dp, vertical = 8.dp)
-            .shadow(16.dp, RoundedCornerShape(34.dp), ambientColor = Blue.copy(alpha = 0.12f))
-            .drawBackdrop(
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val railBackdrop = rememberLayerBackdrop()
+    var dragPx by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    val interactionSources = remember { List(5) { MutableInteractionSource() } }
+    val selectedPressed by interactionSources[selected.coerceIn(0, 4)].collectIsPressedAsState()
+    val press by animateFloatAsState(
+        if (isDragging || selectedPressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = .66f, stiffness = 310f),
+        label = "navGlassPress"
+    )
+    BoxWithConstraints(
+        modifier.padding(horizontal = 13.dp, vertical = 7.dp)
+            .shadow(17.dp, RoundedCornerShape(36.dp),
+                ambientColor = Blue.copy(alpha = .16f))
+            .height(75.dp)
+    ) {
+        val cellWidth = (maxWidth - 14.dp) / names.size
+        val cellPx = with(density) { cellWidth.toPx() }
+        val selectedPosition by animateDpAsState(
+            cellWidth * selected.coerceIn(0, names.lastIndex),
+            spring(dampingRatio = .73f, stiffness = 380f),
+            label = "navThumbPosition"
+        )
+        Box(
+            Modifier.fillMaxSize().drawBackdrop(
                 backdrop = backdrop,
-                shape = { RoundedCornerShape(34.dp) },
+                shape = { RoundedCornerShape(36.dp) },
                 effects = {
                     vibrancy()
-                    blur(6.dp.toPx())
-                    if (android.os.Build.VERSION.SDK_INT >= 33) lens(13.dp.toPx(), 17.dp.toPx())
+                    blur(9.dp.toPx())
+                    lens(21.dp.toPx(), 21.dp.toPx())
                 },
-                onDrawSurface = { drawRect(Color(0xB8FFFFFF)) }
+                highlight = { Highlight.Default.copy(alpha = .35f) },
+                shadow = { Shadow(radius = 10.dp, alpha = .20f) },
+                onDrawSurface = { drawRect(Color(0xB9FFFFFF)) }
             )
-            .border(1.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(34.dp))
-            .padding(horizontal = 7.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        names.forEachIndexed { index, label ->
-            key(index) {
-                val interactions = remember { MutableInteractionSource() }
-                val pressed by interactions.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    targetValue = if (pressed) 0.91f else if (selected == index) 1.04f else 1f,
-                    animationSpec = spring(dampingRatio = 0.65f, stiffness = 500f),
-                    label = "glassTabPress"
+                .border(1.dp, Color.White.copy(.9f), RoundedCornerShape(36.dp))
+        )
+        // Record the track separately. Combined thumb does not capture itself.
+        Box(
+            Modifier.fillMaxSize().alpha(0f).layerBackdrop(railBackdrop)
+                .background(Color(0x66E1E9FA), RoundedCornerShape(36.dp))
+        )
+        Box(
+            Modifier.padding(7.dp)
+                .offset(x = selectedPosition + with(density) { dragPx.toDp() })
+                .width(cellWidth).height(61.dp)
+                .drawBackdrop(
+                    backdrop = rememberCombinedBackdrop(backdrop, railBackdrop),
+                    shape = { RoundedCornerShape(28.dp) },
+                    effects = {
+                        vibrancy()
+                        blur((3f + press * 1f).dp.toPx())
+                        lens(
+                            (11f + press * 6f).dp.toPx(),
+                            (16f + press * 8f).dp.toPx(),
+                            chromaticAberration = press > .03f
+                        )
+                    },
+                    highlight = {
+                        Highlight.Default.copy(alpha = .4f + .55f * press)
+                    },
+                    shadow = { Shadow(radius = 9.dp, alpha = .4f) },
+                    innerShadow = {
+                        InnerShadow(radius = 8.dp * press, alpha = .7f * press)
+                    },
+                    layerBlock = {
+                        scaleX = 1f + .21f * press
+                        scaleY = 1f - .10f * press
+                    },
+                    onDrawSurface = {
+                        drawRect(Color(0xBBDDE8FF))
+                    }
                 )
-                val isSelected = selected == index
-                val glassModifier = if (isSelected) {
-                    Modifier.drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { RoundedCornerShape(25.dp) },
-                        effects = {
-                            vibrancy()
-                            blur(4.dp.toPx())
-                            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                lens(9.dp.toPx(), 14.dp.toPx())
+                .border(1.dp, Color.White.copy(.90f), RoundedCornerShape(28.dp))
+        )
+        Row(
+            Modifier.fillMaxSize().padding(7.dp)
+                .pointerInput(selected, cellPx) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { isDragging = true },
+                        onDragEnd = {
+                            val index = (selected + (dragPx / cellPx).roundToInt())
+                                .coerceIn(0, names.lastIndex)
+                            dragPx = 0f
+                            isDragging = false
+                            if (index != selected) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelected(index)
                             }
                         },
-                        onDrawSurface = { drawRect(Color(0xB8EAF0FF)) }
-                    ).border(1.dp, Color.White.copy(alpha = .9f), RoundedCornerShape(25.dp))
-                } else Modifier
+                        onDragCancel = { dragPx = 0f; isDragging = false }
+                    ) { change, amount ->
+                        change.consume()
+                        dragPx = (dragPx + amount)
+                            .coerceIn(-selected * cellPx,
+                                (names.lastIndex - selected) * cellPx)
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            names.forEachIndexed { i, name ->
                 Column(
-                    Modifier.weight(1f)
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .then(glassModifier)
-                        .clip(RoundedCornerShape(25.dp))
+                    Modifier.weight(1f).fillMaxHeight()
+                        .clip(RoundedCornerShape(28.dp))
                         .clickable(
-                            interactionSource = interactions,
-                            indication = null
-                        ) { onSelected(index) }
-                        .padding(vertical = 9.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                            interactionSource = interactionSources[i],
+                            indication = null,
+                            role = Role.Tab
+                        ) {
+                            if (selected != i) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelected(i)
+                            }
+                        },
+                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        icons[index], contentDescription = label,
-                        tint = if (isSelected) Blue else Slate,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Icon(icons[i], contentDescription = name,
+                        tint = if (selected == i) Blue else Slate,
+                        modifier = Modifier.size(23.dp))
                     Text(
-                        label,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Blue else Slate,
-                        style = MaterialTheme.typography.labelSmall
+                        name,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected == i) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected == i) Blue else Slate
                     )
                 }
             }
