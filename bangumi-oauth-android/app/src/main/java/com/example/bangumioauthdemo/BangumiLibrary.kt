@@ -391,7 +391,7 @@ fun DirectoryDetailsPage(vm: BangumiViewModel, modifier: Modifier = Modifier) {
                 IconButton(onClick = { removeSubject = entry.id }) {
                     Icon(Icons.Default.RemoveCircleOutline, "从目录移除", tint = G.gold)
                 }
-            }) { vm.openedIndex = null; vm.openSubject(entry.id) }
+            }) { vm.closeIndex(); vm.openSubject(entry.id) }
             VerticalDividerLine()
         }
         item { Spacer(Modifier.height(55.dp)) }
