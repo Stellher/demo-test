@@ -148,9 +148,7 @@ fun ProfilePage(
                     Text("同步收藏、评分与章节进度，并自动维护 OAuth 授权。",
                         color = Color.White.copy(alpha = .85f),
                         style = MaterialTheme.typography.bodyMedium)
-                    Button(onClick = onLogin, colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White, contentColor = Ink
-                    ), shape = RoundedCornerShape(15.dp)) { Text("前往 OAuth 授权") }
+                    GlassAction("前往 OAuth 授权", onClick = onLogin, icon = Icons.Outlined.Login)
                 }
             } else {
                 Row(
@@ -206,7 +204,7 @@ fun ProfilePage(
                         .coerceAtLeast(0L) / 3600_000L
                     Text("当前 Token 剩余约 " + remaining + " 小时 · 加密存储",
                         color = Blue, style = MaterialTheme.typography.labelSmall)
-                    TextButton(onClick = onLogin) { Text("管理 OAuth · 手动刷新 · 退出授权") }
+                    GlassAction("管理 OAuth 授权", onClick = onLogin, icon = Icons.Outlined.Settings)
                 }
             }
         }
@@ -214,7 +212,7 @@ fun ProfilePage(
         item {
             ProfileAction("我的收藏", "管理想看、在看、看过与评分", Icons.Outlined.Bookmarks, onOpenLibrary)
             Spacer(Modifier.height(10.dp))
-            ProfileAction("搜索作品", "动画、书籍、音乐与游戏", Icons.Outlined.Search, onOpenSearch)
+            ProfileAction("探索全部条目", "动画、角色、制作人员与关键词搜索", Icons.Outlined.Search, onOpenSearch)
             Spacer(Modifier.height(10.dp))
             ProfileAction("API 实验室", "56 个官方公开 API、OAuth 与请求工具",
                 Icons.Outlined.Terminal, onOpenApiLab)
@@ -237,23 +235,27 @@ private fun ProfileAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(19.dp))
-            .background(Color.White.copy(alpha = .89f))
-            .border(1.dp, Line, RoundedCornerShape(19.dp))
-            .clickable(onClick = onClick).padding(15.dp),
-        horizontalArrangement = Arrangement.spacedBy(15.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        radius = 21.dp,
+        tint = Color(0xA5FFFFFF)
     ) {
-        Box(Modifier.size(46.dp).background(Color(0xFFEFF2FC), RoundedCornerShape(15.dp)),
-            contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Blue)
+        Row(
+            Modifier.fillMaxWidth().padding(15.dp),
+            horizontalArrangement = Arrangement.spacedBy(15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(46.dp)
+                .background(Color(0x88DCE5FF), RoundedCornerShape(15.dp)),
+                contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = Blue)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, color = Ink, style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold)
+                Text(description, color = Slate, style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Blue)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, color = Ink, style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold)
-            Text(description, color = Slate, style = MaterialTheme.typography.bodySmall)
-        }
-        Icon(Icons.Outlined.ChevronRight, null, tint = Slate)
     }
 }
