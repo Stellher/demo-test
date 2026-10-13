@@ -60,3 +60,69 @@ jobs:
           name: bangumi-glass-230-liquid-ux-android-studio-source
           path: bangumi-glass-source.zip
           retention-days: 7
+
+  emulator-visual:
+    name: Android 15 visual verification
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Prepare SDK36 and official catalog
+        run: |
+          ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          TOOL="$(find "$ROOT/cmdline-tools" -type f -name sdkmanager | head -1)"
+          "$TOOL" "platforms;android-36" "build-tools;36.0.0"
+          python -m pip install --user pyyaml
+          python bangumi-oauth-android/scripts/generate_catalog.py
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Render actual screens in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 2048M
+          heap-size: 384M
+          emulator-boot-timeout: 900
+          disable-animations: false
+          script: |
+            set -e
+            gradle --no-daemon -p bangumi-oauth-android :app:assembleDebug
+            adb install -r bangumi-oauth-android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.example.bangumioauthdemo/.BangumiHomeActivity
+            sleep 16
+            mkdir -p ui-screenshots
+            adb shell screencap -p /sdcard/overview.png
+            adb pull /sdcard/overview.png ui-screenshots/01-overview.png
+            SIZE="$(adb shell wm size | sed -n 's/Physical size: //p' | tr -d '\r')"
+            W="${SIZE%x*}"
+            H="${SIZE#*x}"
+            Y="$((H - 105))"
+            adb shell input tap "$((W / 2))" "$Y"
+            sleep 11
+            adb shell screencap -p /sdcard/season.png
+            adb pull /sdcard/season.png ui-screenshots/02-season-tv.png
+            adb shell input tap "$((W * 9 / 10))" "$Y"
+            sleep 7
+            adb shell screencap -p /sdcard/profile.png
+            adb pull /sdcard/profile.png ui-screenshots/03-profile.png
+            adb logcat -d -s AndroidRuntime:E > ui-screenshots/android-runtime-errors.log || true
+            if grep -q 'FATAL EXCEPTION' ui-screenshots/android-runtime-errors.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bangumi-glass-230-android-emulator-screenshots
+          path: ui-screenshots
+          retention-days: 7
