@@ -49,12 +49,7 @@ fun DiscoverPage(
     ) {
         item {
             PageTitle("ANIME DISCOVERY", "发现好作品", "每一天都值得期待一部好动画") {
-                IconButton(
-                    onClick = openSearch,
-                    modifier = Modifier.background(Color.White.copy(alpha = .85f), RoundedCornerShape(22.dp))
-                ) {
-                    Icon(Icons.Outlined.Search, "搜索 Bangumi", tint = Ink)
-                }
+                GlassIconAction(Icons.Outlined.Search, "搜索 Bangumi", onClick = openSearch)
             }
         }
         item {
@@ -237,33 +232,68 @@ fun SeasonPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
     LaunchedEffect(Unit) { vm.loadSeason() }
     val year = vm.seasonYear
     val quarter = vm.seasonQuarter
+    val animeCategory = vm.seasonCategory
     val r = vm.seasonal
     val quarters = listOf("一月 · 冬番", "四月 · 春番", "七月 · 夏番", "十月 · 秋番")
-    LazyColumn(contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            PageTitle("SEASONAL ARCHIVE", "季度新番", "通过 Bangumi 年份与月份筛选真实条目")
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { vm.selectSeason(year - 1, quarter) }) {
-                    Icon(Icons.Outlined.ChevronLeft, "上一年", tint = Ink)
+            PageTitle("SEASONAL ANIME", "季度新番", "严格筛选 Bangumi 动画条目 · 分类与放送日期双校验")
+            Spacer(Modifier.height(20.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                GlassIconAction(Icons.Outlined.ChevronLeft, "上一年",
+                    onClick = { vm.selectSeason(year - 1, quarter) })
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(year.toString(), style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold, color = Ink)
+                    Text("SELECT YEAR", color = Slate,
+                        style = MaterialTheme.typography.labelSmall)
                 }
-                Text(year.toString() + " 年",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold, color = Ink)
-                IconButton(onClick = { vm.selectSeason(year + 1, quarter) }) {
-                    Icon(Icons.Outlined.ChevronRight, "下一年", tint = Ink)
-                }
+                GlassIconAction(Icons.Outlined.ChevronRight, "下一年",
+                    onClick = { vm.selectSeason(year + 1, quarter) })
             }
+        }
+        item {
+            Text("季度", style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold, color = Ink)
+            Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                quarters.forEachIndexed { i, label ->
-                    SoftChip(label, selected = quarter == i + 1) { vm.selectSeason(year, i + 1) }
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                quarters.forEachIndexed { index, label ->
+                    SoftChip(label, selected = quarter == index + 1) {
+                        vm.selectSeason(year, index + 1)
+                    }
                 }
             }
         }
         item {
-            SectionTitle(quarters[quarter - 1], "包含当季三个月份的动画 · " + (r.data?.size ?: "…").toString() + " 部")
+            Text("动画类型", style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold, color = Ink)
+            Spacer(Modifier.height(8.dp))
+            Text("默认仅显示 TV 动画；切换至「全部动画」可查看 OVA、剧场版与 WEB。",
+                color = Slate, style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                SeasonFilter.categoryOptions.forEach { (category, label) ->
+                    SoftChip(label, selected = animeCategory == category) {
+                        vm.selectSeasonCategory(category)
+                    }
+                }
+            }
+        }
+        item {
+            val resultCount = r.data?.size
+            SectionTitle(
+                title = quarters[quarter - 1],
+                subtitle = (if (resultCount == null) "正在筛选…" else "共 $resultCount 部") +
+                    " · " + SeasonFilter.categoryOptions.first { it.first == animeCategory }.second,
+                action = "刷新",
+                onClick = { vm.loadSeason(true) }
+            )
         }
         if (r.data == null) {
             item { StatusMessage(r.loading, r.error, false) { vm.loadSeason(true) } }
@@ -271,13 +301,25 @@ fun SeasonPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
             val shows = r.data.orEmpty()
             if (shows.isEmpty()) item { StatusMessage(false, null, true) }
             items(shows.chunked(2)) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
                     row.forEach { item ->
-                        AnimePoster(item, modifier = Modifier.weight(1f)) { openSubject(item.id) }
+                        AnimePoster(item, modifier = Modifier.weight(1f)) {
+                            openSubject(item.id)
+                        }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
+        }
+        item {
+            Text(
+                "数据：Bangumi /v0/subjects · 服务端 type=2 + cat/年份/月筛选；" +
+                    "客户端再次核对动画类型、子分类和当季日期。未标明放送日期的条目不会混入。",
+                color = Slate, style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
