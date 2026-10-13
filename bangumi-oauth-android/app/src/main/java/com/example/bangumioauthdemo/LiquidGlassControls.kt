@@ -187,6 +187,39 @@ fun GlassSelectionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /**
+ * Large sampled-glass surface for feature panels and summaries.
+ * Not used on each list item; the app caps expensive GPU refraction to visible UI chrome.
+ */
+@Composable
+fun GlassPanel(
+    modifier: Modifier = Modifier,
+    radius: Dp = 26.dp,
+    tint: Color = Color(0xACFFFFFF),
+    content: @Composable BoxScope.() -> Unit
+) {
+    val backdrop = LocalGlassBackdrop.current
+    val shape = RoundedCornerShape(radius)
+    Box(
+        modifier.then(if (backdrop != null) {
+            Modifier.drawBackdrop(
+                backdrop = backdrop,
+                shape = { shape },
+                effects = {
+                    vibrancy()
+                    blur(10.dp.toPx())
+                    lens(19.dp.toPx(), 23.dp.toPx(), chromaticAberration = true)
+                },
+                highlight = { Highlight.Default.copy(alpha = .70f) },
+                shadow = { Shadow(radius = 18.dp, alpha = .65f) },
+                innerShadow = { InnerShadow(radius = 10.dp, alpha = .16f) },
+                onDrawSurface = { drawRect(tint) }
+            )
+        } else Modifier.background(tint, shape)),
+        content = content
+    )
+}
+
+/**
  * Dynamic liquid dock: spring-following selector, long-press/drag to change tabs,
  * transient chromatic dispersion, refractive capsule and haptic snap.
  * Modeled after the interaction structure of Kyant's LiquidBottomTabs sample.
