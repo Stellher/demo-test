@@ -100,9 +100,18 @@ data class CollectionEdit(
     val comment: String = "",
     val tags: List<String> = emptyList()
 ) {
-    fun payload(): JSONObject = JSONObject().put("type", type)
-        .put("rate", rate).put("comment", comment)
-        .put("tags", JSONArray(tags))
+    fun payload(): JSONObject {
+        require(type in 1..5) { "无效的收藏状态" }
+        require(rate in 0..10) { "评分必须在 0 至 10 之间" }
+        require(tags.none { tag -> tag.any(Char::isWhitespace) }) {
+            "Bangumi 收藏标签不能包含空格，请使用逗号分隔多个标签"
+        }
+        return JSONObject()
+            .put("type", type)
+            .put("rate", rate)
+            .put("comment", comment)
+            .put("tags", JSONArray(tags))
+    }
 }
 
 fun String.safeYear(): Int = toIntOrNull()?.coerceIn(1900, 2100) ?: LocalDate.now().year
