@@ -3,10 +3,8 @@ package com.example.bangumioauthdemo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -22,7 +20,6 @@ class BangumiRepository {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
     private val userAgent = "BangumiGlass/1.0 (Android; github.com/Stellher/demo-test)"
 
     private suspend fun request(
@@ -50,8 +47,15 @@ class BangumiRepository {
                 .header("Accept", "application/json")
             if (!accessToken.isNullOrBlank()) requestBuilder
                 .header("Authorization", "Bearer " + accessToken)
-            val requestBody = if (method == "GET") null
-            else (body?.toString() ?: "").toRequestBody(jsonMedia)
+            val requestBody = if (method == "GET" || method == "HEAD") {
+                null
+            } else {
+                BangumiJsonRequestBodies.encode(body?.toString() ?: "")
+            }
+            if (requestBody != null) {
+                // The API checks the exact Content-Type; do not append charset=utf-8.
+                requestBuilder.header("Content-Type", BangumiJsonRequestBodies.CONTENT_TYPE)
+            }
             requestBuilder.method(method, requestBody)
             return http.newCall(requestBuilder.build()).execute().use { response ->
                 response.code to response.body?.string().orEmpty()
