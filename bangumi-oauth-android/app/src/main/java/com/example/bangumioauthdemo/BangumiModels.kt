@@ -98,7 +98,8 @@ data class CollectionEdit(
     val type: Int,
     val rate: Int = 0,
     val comment: String = "",
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val isPrivate: Boolean = false
 ) {
     fun payload(): JSONObject {
         require(type in 1..5) { "无效的收藏状态" }
@@ -111,6 +112,7 @@ data class CollectionEdit(
             .put("rate", rate)
             .put("comment", comment)
             .put("tags", JSONArray(tags))
+            .put("private", isPrivate)
     }
 }
 
