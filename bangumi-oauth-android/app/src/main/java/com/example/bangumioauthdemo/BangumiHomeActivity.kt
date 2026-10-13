@@ -7,6 +7,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -106,7 +115,23 @@ private fun BangumiHomeApp(
                     openSubject = vm::openSubject,
                     openPerson = vm::openPerson
                 )
-                else -> when (currentTab) {
+                else -> AnimatedContent(
+                    targetState = currentTab,
+                    transitionSpec = {
+                        val sign = if (targetState > initialState) 1 else -1
+                        (fadeIn(tween(210)) + slideInHorizontally(
+                            initialOffsetX = { fullWidth -> sign * fullWidth / 7 },
+                            animationSpec = spring(dampingRatio = .86f, stiffness = 420f)
+                        )).togetherWith(
+                            fadeOut(tween(150)) + slideOutHorizontally(
+                                targetOffsetX = { fullWidth -> -sign * fullWidth / 10 },
+                                animationSpec = spring(dampingRatio = .95f, stiffness = 550f)
+                            )
+                        )
+                    },
+                    label = "Spring liquid screen transition"
+                ) { tab ->
+                    when (tab) {
                     0 -> DiscoverPage(
                         vm = vm,
                         openSubject = vm::openSubject,
@@ -123,6 +148,7 @@ private fun BangumiHomeApp(
                         onOpenApiLab = openOAuthLab,
                         onOpenSearch = { searchOpen = true }
                     )
+                    }
                 }
             }
             }
