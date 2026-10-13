@@ -2,7 +2,7 @@ name: Bangumi OAuth Android Release
 on:
   push:
     branches:
-      - build/bangumi-oauth-api-explorer-20261013
+      - build/bangumi-oauth-auto-refresh-20261014
   pull_request:
     branches:
       - main
@@ -44,6 +44,6 @@ jobs:
           "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-oauth-all-apis-release-apk
+          name: bangumi-oauth-auto-refresh-release-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
