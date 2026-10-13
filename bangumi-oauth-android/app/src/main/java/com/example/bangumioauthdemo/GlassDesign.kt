@@ -275,26 +275,29 @@ fun SectionTitle(title: String, subtitle: String? = null, action: String? = null
 
 @Composable
 fun SoftChip(text: String, selected: Boolean = false, onClick: () -> Unit) {
-    Box(
-        Modifier.clip(RoundedCornerShape(100))
-            .background(if (selected) Ink else Color.White.copy(alpha = .92f))
-            .border(1.dp, if (selected) Ink else Line, RoundedCornerShape(100))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp)
-    ) {
-        Text(text, color = if (selected) Color.White else Ink,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-    }
+    LiquidTextAction(
+        text = text,
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.height(41.dp)
+    )
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun AnimePoster(
     subject: AnimeCard,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Column(modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val onPreview = LocalAnimePreviewHandler.current
+    Column(
+        modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = { onPreview?.invoke(subject) ?: onClick() }
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(0.70f)
                 .clip(RoundedCornerShape(19.dp))
@@ -347,12 +350,17 @@ fun PosterShelf(items: List<AnimeCard>, onClick: (Int) -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun AnimeListRow(item: AnimeCard, onClick: () -> Unit, caption: String = "") {
+    val onPreview = LocalAnimePreviewHandler.current
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
             .background(Color.White.copy(alpha = .89f))
             .border(1.dp, Line, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { onPreview?.invoke(item) ?: onClick() }
+            )
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
         verticalAlignment = Alignment.CenterVertically
