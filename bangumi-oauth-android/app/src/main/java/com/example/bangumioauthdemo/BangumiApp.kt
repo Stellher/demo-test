@@ -1,5 +1,6 @@
 package com.example.bangumioauthdemo
 
+import androidx.activity.compose.BackHandler
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.*
@@ -58,7 +59,17 @@ fun BangumiApp(
     val backdrop = rememberLayerBackdrop()
 
     LaunchedEffect(token?.accessToken) {
-        if (token != null && vm.profile == null) vm.loadProfile()
+        if (token != null) vm.loadProfile()
+        else vm.clearAccountData()
+    }
+    BackHandler(enabled = developer || vm.focusedPerson != null ||
+        vm.detail != null || vm.openedIndex != null) {
+        when {
+            developer -> developer = false
+            vm.focusedPerson != null -> vm.closePerson()
+            vm.detail != null -> vm.closeSubject()
+            vm.openedIndex != null -> vm.closeIndex()
+        }
     }
 
     if (developer) {
