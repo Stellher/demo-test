@@ -366,7 +366,7 @@ fun DirectoryDetailsPage(vm: BangumiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(17.dp)
     ) {
         item {
-            TextButton(onClick = { vm.openedIndex = null }) {
+            TextButton(onClick = { vm.closeIndex() }) {
                 Icon(Icons.Default.ArrowBack, null)
                 Spacer(Modifier.width(8.dp))
                 Text("返回个人中心")
