@@ -41,6 +41,8 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var search by mutableStateOf(Resource<List<AnimeCard>>())
         private set
+    var peopleSearch by mutableStateOf(Resource<List<PersonCard>>())
+        private set
     var library by mutableStateOf(Resource<List<CollectionCard>>())
         private set
     var profile by mutableStateOf(Resource<AccountCard>())
@@ -126,6 +128,21 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try { search = Resource(data = repo.search(text, type)) }
             catch (e: Exception) { search = Resource(error = e.message ?: "搜索失败") }
+        }
+    }
+
+    fun searchPeople(text: String, characters: Boolean) {
+        if (text.trim().isBlank()) {
+            peopleSearch = Resource()
+            return
+        }
+        peopleSearch = Resource(loading = true)
+        viewModelScope.launch {
+            try {
+                peopleSearch = Resource(data = repo.searchPeople(text, characters))
+            } catch (e: Exception) {
+                peopleSearch = Resource(error = e.message ?: "人物搜索失败")
+            }
         }
     }
 
