@@ -132,6 +132,21 @@ class BangumiRepository {
         return res.pageData().map(JSONObject::card).filter { it.id > 0 }
     }
 
+    /** Full-text search over Bangumi character and person indexes. */
+    suspend fun searchPeople(keyword: String, characters: Boolean): List<PersonCard> {
+        val clean = keyword.trim()
+        require(clean.isNotEmpty()) { "请输入角色或人物关键词" }
+        val endpoint = if (characters) "/v0/search/characters" else "/v0/search/persons"
+        val result = JSONObject(request(
+            path = endpoint,
+            method = "POST",
+            params = mapOf("limit" to "30", "offset" to "0"),
+            body = JSONObject().put("keyword", clean)
+        ))
+        return result.pageData().map { it.person(if (characters) "角色" else "人物") }
+            .filter { it.id > 0 }
+    }
+
     suspend fun calendar(): List<BroadcastDay> {
         val result = JSONArray(request("/calendar"))
         return result.jsonItems().map { day ->
