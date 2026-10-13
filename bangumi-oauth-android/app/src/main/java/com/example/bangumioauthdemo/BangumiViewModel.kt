@@ -168,8 +168,8 @@ class BangumiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateSearchQuery(text: String) { discoveryQuery = text }
-    fun setDiscoveryType(type: Int) { discoveryType = type; submitSearch() }
-    fun setDiscoverySort(sort: String) { discoverySort = sort; submitSearch() }
+    fun chooseDiscoveryType(type: Int) { discoveryType = type; submitSearch() }
+    fun chooseDiscoverySort(sort: String) { discoverySort = sort; submitSearch() }
 
     fun submitSearch(more: Boolean = false) {
         if (more && ("search" in loadingKeys || discoveryItems.size >= discoveryTotal && discoveryTotal > 0)) return
@@ -189,7 +189,7 @@ class BangumiViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setCollectionType(type: Int) { collectionType = type; loadCollections() }
+    fun chooseCollectionType(type: Int) { collectionType = type; loadCollections() }
     fun loadProfile() {
         work("profile") {
             profile = api.myself()
