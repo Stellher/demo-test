@@ -1,4 +1,4 @@
-name: Bangumi OAuth Android Release
+name: Bangumi Glass Full Client Release
 on:
   push:
     branches:
