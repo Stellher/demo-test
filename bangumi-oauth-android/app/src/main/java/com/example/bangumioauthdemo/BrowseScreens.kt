@@ -286,13 +286,23 @@ fun SeasonPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
 fun SearchPage(
     vm: BangumiBrowseViewModel,
     onBack: () -> Unit,
-    openSubject: (Int) -> Unit
+    openSubject: (Int) -> Unit,
+    openPerson: (Int, Boolean) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var type by remember { mutableStateOf<Int?>(null) }
+    var mode by remember { mutableIntStateOf(0) }
     val resource = vm.search
-    val categories = listOf(null to "全部", 2 to "动画", 1 to "书籍", 3 to "音乐", 4 to "游戏", 6 to "三次元")
-    fun submit() = vm.searchSubjects(query, type)
+    val people = vm.peopleSearch
+    val modes = listOf("作品", "角色", "人物")
+    val categories = listOf(
+        null to "全部", 2 to "动画", 1 to "书籍",
+        3 to "音乐", 4 to "游戏", 6 to "三次元"
+    )
+    fun submit() {
+        if (mode == 0) vm.searchSubjects(query, type)
+        else vm.searchPeople(query, characters = mode == 1)
+    }
     LazyColumn(contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(13.dp)) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -300,42 +310,104 @@ fun SearchPage(
                 Text("搜索 Bangumi", style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold, color = Ink)
             }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                modes.forEachIndexed { index, label ->
+                    SoftChip(label, selected = mode == index) {
+                        mode = index
+                        if (query.isNotBlank()) submit()
+                    }
+                }
+            }
+            Spacer(Modifier.height(11.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("作品名称、关键词…") },
+                placeholder = { Text(when (mode) {
+                    1 -> "输入角色名称…"
+                    2 -> "输入声优、制作人等人物名称…"
+                    else -> "作品名称、关键词…"
+                }) },
                 shape = RoundedCornerShape(20.dp),
                 leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 trailingIcon = {
-                    IconButton(onClick = { submit() }) { Icon(Icons.Outlined.ArrowForward, "搜索") }
+                    IconButton(onClick = { submit() }) {
+                        Icon(Icons.Outlined.ArrowForward, "搜索")
+                    }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { submit() })
             )
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                categories.forEach { pair ->
-                    SoftChip(pair.second, selected = type == pair.first) {
-                        type = pair.first
-                        if (query.isNotBlank()) submit()
+            if (mode == 0) {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.forEach { pair ->
+                        SoftChip(pair.second, selected = type == pair.first) {
+                            type = pair.first
+                            if (query.isNotBlank()) submit()
+                        }
                     }
                 }
             }
         }
         item {
-            SectionTitle("搜索结果", if (query.isBlank()) "输入作品名称后搜索" else "关键词：" + query)
+            SectionTitle(modes[mode] + "搜索结果",
+                if (query.isBlank()) "输入关键词后搜索" else "关键词：" + query)
         }
-        if (resource.data == null) {
-            item {
-                StatusMessage(resource.loading, resource.error,
-                    resource.error == null && !resource.loading)
+        if (mode == 0) {
+            if (resource.data == null) {
+                item {
+                    StatusMessage(resource.loading, resource.error,
+                        resource.error == null && !resource.loading)
+                }
+            } else {
+                val results = resource.data.orEmpty()
+                if (results.isEmpty()) item { StatusMessage(false, null, true) }
+                items(results, key = { it.id }) { subject ->
+                    AnimeListRow(subject, { openSubject(subject.id) })
+                }
             }
         } else {
-            val items = resource.data.orEmpty()
-            if (items.isEmpty()) item { StatusMessage(false, null, true) }
-            items(items, key = { it.id }) { item -> AnimeListRow(item, { openSubject(item.id) }) }
+            if (people.data == null) {
+                item {
+                    StatusMessage(people.loading, people.error,
+                        people.error == null && !people.loading)
+                }
+            } else {
+                val found = people.data.orEmpty()
+                if (found.isEmpty()) item { StatusMessage(false, null, true) }
+                items(found, key = { it.id }) { person ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(Color.White.copy(alpha = .88f), RoundedCornerShape(19.dp))
+                            .border(1.dp, Line, RoundedCornerShape(19.dp))
+                            .clickable { openPerson(person.id, mode == 1) }
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(69.dp).clip(RoundedCornerShape(15.dp))
+                            .background(Color(0xFFE4EAF5))) {
+                            AsyncImage(
+                                model = person.image.replace("http://", "https://"),
+                                contentDescription = person.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(person.name, color = Ink,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold)
+                            Text(if (mode == 1) "角色档案" else "人物档案",
+                                style = MaterialTheme.typography.bodySmall, color = Slate)
+                        }
+                        Icon(Icons.Outlined.ChevronRight, "查看详情", tint = Slate)
+                    }
+                }
+            }
         }
     }
 }
