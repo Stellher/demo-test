@@ -29,30 +29,24 @@ fun SubjectPage(
     back: () -> Unit,
     openSubject: (Int) -> Unit,
     openPerson: (Int, Boolean) -> Unit,
-    openLogin: () -> Unit
+    openLogin: () -> Unit,
+    onEditCollection: () -> Unit
 ) {
     val loaded = vm.subject
-    var editing by remember(vm.selectedSubject) { mutableStateOf(false) }
     var showAllEpisodes by remember(vm.selectedSubject) { mutableStateOf(false) }
     val session by vm.authorization.collectAsStateWithLifecycleCompat()
-    if (editing && loaded.data != null) {
-        CollectionEditor(loaded.data!!.collection, onDismiss = { editing = false }) { edit ->
-            vm.updateCollection(loaded.data!!.subject.optInt("id"), edit) { editing = false }
-        }
-    }
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 114.dp),
         verticalArrangement = Arrangement.spacedBy(19.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = back) {
-                Icon(Icons.Outlined.ArrowBack, "返回", tint = Ink)
-            }
+            LiquidIconAction(Icons.Outlined.ArrowBack, "返回", back)
             Text("作品详情", style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
-            IconButton(onClick = { vm.selectedSubject?.let { vm.loadSubject(it) } }) {
-                Icon(Icons.Outlined.Refresh, "刷新条目", tint = Ink)
+            LiquidIconAction(Icons.Outlined.Refresh, "刷新条目") {
+                vm.selectedSubject?.let { vm.loadSubject(it) }
             }
         }
         val data = loaded.data
@@ -87,29 +81,29 @@ fun SubjectPage(
                     style = MaterialTheme.typography.labelMedium, color = Blue)
             }
         }
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                .background(Color.White.copy(alpha = .8f)).padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Metric("综合评分", if (item.score > 0) String.format("%.1f", item.score) else "—", "★")
-            Metric("排名", if (item.rank > 0) "#" + item.rank else "—", "↗")
-            Metric("收藏", if (item.collectionCount > 0) item.collectionCount.toString() else "—", "♡")
+        LiquidGlassPanel(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly) {
+                Metric("综合评分", if (item.score > 0) String.format("%.1f", item.score) else "—", "★")
+                Metric("排名", if (item.rank > 0) "#" + item.rank else "—", "↗")
+                Metric("收藏", if (item.collectionCount > 0) item.collectionCount.toString() else "—", "♡")
+            }
         }
         if (session == null) {
-            Button(onClick = openLogin, modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)) {
-                Icon(Icons.Outlined.Login, null)
-                Spacer(Modifier.width(9.dp))
-                Text("登录后管理收藏与观看进度")
-            }
+            LiquidTextAction(
+                text = "登录后管理收藏与观看进度",
+                onClick = openLogin,
+                icon = Icons.Outlined.Login,
+                modifier = Modifier.fillMaxWidth().height(54.dp)
+            )
         } else {
-            Button(onClick = { editing = true }, modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)) {
-                Icon(Icons.Outlined.Edit, null)
-                Spacer(Modifier.width(9.dp))
-                Text(if (data.collection == null) "加入我的收藏" else "编辑收藏 · 评分 · 标签 · 评论")
-            }
+            LiquidTextAction(
+                text = if (data.collection == null) "加入我的收藏" else "编辑收藏、评分与短评",
+                onClick = onEditCollection,
+                selected = true,
+                icon = Icons.Outlined.Edit,
+                modifier = Modifier.fillMaxWidth().height(54.dp)
+            )
         }
         Hairline()
         SectionTitle("作品简介")
@@ -218,10 +212,9 @@ private fun EpisodeRow(ep: EpisodeCard, enabled: Boolean, markSeen: () -> Unit) 
             if (ep.airDate.isNotBlank()) Text(ep.airDate, style = MaterialTheme.typography.labelSmall,
                 color = Slate)
         }
-        IconButton(onClick = markSeen, enabled = enabled) {
-            Icon(Icons.Outlined.CheckCircle, "标记已看",
-                tint = if (enabled) Blue else Slate)
-        }
+        LiquidIconAction(Icons.Outlined.CheckCircle, "标记已看",
+            onClick = { if (enabled) markSeen() },
+            modifier = Modifier.size(42.dp))
     }
 }
 
@@ -295,67 +288,6 @@ fun PersonPage(vm: BangumiBrowseViewModel, back: () -> Unit) {
             }
         }
     }
-}
-
-@Composable
-private fun CollectionEditor(
-    existing: JSONObject?,
-    onDismiss: () -> Unit,
-    save: (CollectionEdit) -> Unit
-) {
-    var collectionType by remember { mutableIntStateOf(existing?.optInt("type", 1) ?: 1) }
-    var rate by remember { mutableFloatStateOf((existing?.optInt("rate") ?: 0).toFloat()) }
-    var comment by remember { mutableStateOf(existing?.s("comment").orEmpty()) }
-    var tags by remember {
-        mutableStateOf(existing?.arr("tags")?.stringItems()?.joinToString(", ").orEmpty())
-    }
-    val types = listOf("想看", "看过", "在看", "搁置", "抛弃")
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("编辑我的收藏", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                Text("收藏状态", style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    types.forEachIndexed { i, text ->
-                        SoftChip(text, selected = collectionType == i + 1) {
-                            collectionType = i + 1
-                        }
-                    }
-                }
-                Text("我的评分 · " + rate.toInt() + "/10",
-                    style = MaterialTheme.typography.bodyMedium)
-                Slider(rate, onValueChange = { rate = it },
-                    valueRange = 0f..10f, steps = 9)
-                OutlinedTextField(
-                    value = tags, onValueChange = { tags = it },
-                    label = { Text("标签（逗号分隔）") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = comment, onValueChange = { comment = it },
-                    label = { Text("我的短评 / 评论") },
-                    modifier = Modifier.fillMaxWidth(), minLines = 3
-                )
-                Text("保存会修改 Bangumi 账号上的真实收藏数据。",
-                    color = Slate, style = MaterialTheme.typography.labelSmall)
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                save(CollectionEdit(
-                    collectionType, rate.toInt(), comment,
-                    tags.split(",", "，").map { it.trim() }.filter { it.isNotEmpty() }
-                ))
-            }) { Text("保存到 Bangumi") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-        shape = RoundedCornerShape(28.dp)
-    )
 }
 
 /** Small typed Flow adapter so details can observe the active session without storing tokens in UI. */
