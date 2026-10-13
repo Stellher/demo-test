@@ -1,0 +1,72 @@
+name: Bangumi Glass emulator UI smoke
+on:
+  push:
+    branches:
+      - build/bangumi-glass-ux-season-v230-20261014
+  workflow_dispatch:
+jobs:
+  emulator-ui-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Generate official Bangumi API catalog
+        run: |
+          python -m pip install --user pyyaml
+          python bangumi-oauth-android/scripts/generate_catalog.py
+      - name: Enable /dev/kvm if present
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; else echo "No hardware virtualization available; emulator may be slow"; fi
+      - name: Boot Android emulator, exercise UI and collect screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 2048M
+          heap-size: 384M
+          disk-size: 4096M
+          emulator-boot-timeout: 900
+          disable-animations: false
+          script: |
+            set -e
+            gradle --no-daemon -p bangumi-oauth-android :app:assembleDebug
+            adb install -r bangumi-oauth-android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.example.bangumioauthdemo/.BangumiHomeActivity
+            sleep 12
+            mkdir -p ui-screenshots
+            adb shell screencap -p /sdcard/discover.png
+            adb pull /sdcard/discover.png ui-screenshots/01-discover.png
+            SIZE="$(adb shell wm size | sed -n 's/Physical size: //p' | tr -d '\r')"
+            W="${SIZE%x*}"
+            H="${SIZE#*x}"
+            Y="$((H - 120))"
+            adb shell input tap "$((W / 2))" "$Y"
+            sleep 10
+            adb shell screencap -p /sdcard/season.png
+            adb pull /sdcard/season.png ui-screenshots/02-season-tv.png
+            adb shell input tap "$((W * 9 / 10))" "$Y"
+            sleep 4
+            adb shell screencap -p /sdcard/profile.png
+            adb pull /sdcard/profile.png ui-screenshots/03-profile.png
+            adb logcat -d -s AndroidRuntime:E OpenGLRenderer:E > ui-screenshots/logcat-errors.txt || true
+            if grep -q 'FATAL EXCEPTION' ui-screenshots/logcat-errors.txt; then
+              echo 'App crashed in emulator'; exit 1
+            fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bangumi-glass-ux-emulator-screenshots
+          path: ui-screenshots/
+          retention-days: 7
