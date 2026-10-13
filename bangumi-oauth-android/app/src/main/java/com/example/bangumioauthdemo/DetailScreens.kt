@@ -36,8 +36,16 @@ fun SubjectPage(
     var showAllEpisodes by remember(vm.selectedSubject) { mutableStateOf(false) }
     val session by vm.authorization.collectAsStateWithLifecycleCompat()
     if (editing && loaded.data != null) {
-        CollectionEditor(loaded.data!!.collection, onDismiss = { editing = false }) { edit ->
-            vm.updateCollection(loaded.data!!.subject.optInt("id"), edit) { editing = false }
+        CollectionEditor(
+            existing = loaded.data!!.collection,
+            saving = vm.actionBusy,
+            onDismiss = { if (!vm.actionBusy) editing = false }
+        ) { edit ->
+            if (!vm.actionBusy) {
+                vm.updateCollection(loaded.data!!.subject.optInt("id"), edit) {
+                    editing = false
+                }
+            }
         }
     }
     Column(
@@ -300,6 +308,7 @@ fun PersonPage(vm: BangumiBrowseViewModel, back: () -> Unit) {
 @Composable
 private fun CollectionEditor(
     existing: JSONObject?,
+    saving: Boolean,
     onDismiss: () -> Unit,
     save: (CollectionEdit) -> Unit
 ) {
@@ -311,7 +320,7 @@ private fun CollectionEditor(
     }
     val types = listOf("想看", "看过", "在看", "搁置", "抛弃")
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!saving) onDismiss() },
         title = { Text("编辑我的收藏", fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()),
@@ -341,18 +350,25 @@ private fun CollectionEditor(
                 )
                 Text("保存会修改 Bangumi 账号上的真实收藏数据。",
                     color = Slate, style = MaterialTheme.typography.labelSmall)
+                if (saving) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                save(CollectionEdit(
-                    collectionType, rate.toInt(), comment,
-                    tags.split(",", "，").map { it.trim() }.filter { it.isNotEmpty() }
-                ))
-            }) { Text("保存到 Bangumi") }
+            Button(
+                enabled = !saving,
+                onClick = {
+                    if (!saving) save(CollectionEdit(
+                        collectionType, rate.toInt(), comment,
+                        tags.split(",", "，").map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                    ))
+                }
+            ) { Text(if (saving) "保存中…" else "保存到 Bangumi") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("取消") }
         },
         shape = RoundedCornerShape(28.dp)
     )
