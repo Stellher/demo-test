@@ -47,7 +47,8 @@ class SeasonFilterTest {
         val candidates = listOf(noCatTv, noCatUnknownPlatform, noCatMovie, noCatGame)
         assertEquals(listOf(200, 201), SeasonFilter.apply(candidates, 2026, 4, 1).map { it.id })
         assertEquals(listOf(200, 201, 202), SeasonFilter.apply(candidates, 2026, 4, null).map { it.id })
-        assertEquals(listOf(202), SeasonFilter.apply(candidates, 2026, 4, 3).map { it.id })
+        // Unknown platforms have no unambiguous subtype; the server-side cat filter is authoritative.
+        assertEquals(listOf(201, 202), SeasonFilter.apply(candidates, 2026, 4, 3).map { it.id })
     }
 
     @Test
