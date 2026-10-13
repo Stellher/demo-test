@@ -95,27 +95,44 @@ class BangumiRepository {
             "offset" to offset.toString(), "limit" to limit.toString()
         )).pageData().map(JSONObject::card).filter { it.id > 0 }
 
-    suspend fun season(year: Int, quarter: Int): List<AnimeCard> {
-        val selected = quarter.coerceIn(1, 4)
-        val months = (1..3).map { (selected - 1) * 3 + it }
+    suspend fun season(
+        year: Int,
+        quarter: Int,
+        animeCategory: Int? = 1
+    ): List<AnimeCard> {
+        val months = SeasonFilter.quarterMonths(quarter)
         val collected = mutableListOf<AnimeCard>()
-        var success = 0
+        var succeeded = 0
         var firstFailure: Exception? = null
-        months.forEach { month ->
+        for (month in months) {
             try {
-                val result = objectResponse("/v0/subjects", mapOf(
-                    "type" to "2", "year" to year.toString(),
-                    "month" to month.toString(), "sort" to "date",
-                    "limit" to "60", "offset" to "0"
-                )).pageData().map(JSONObject::card)
-                collected += result
-                success++
+                var offset = 0
+                val limit = 100
+                // Bound initial requests; do not block the UI indefinitely for very large seasons.
+                while (offset < 300) {
+                    val result = objectResponse("/v0/subjects", buildMap {
+                        put("type", SeasonFilter.ANIME.toString())
+                        if (animeCategory != null) put("cat", animeCategory.toString())
+                        put("year", year.toString())
+                        put("month", month.toString())
+                        put("sort", "date")
+                        put("limit", limit.toString())
+                        put("offset", offset.toString())
+                    })
+                    val page = result.pageData().map(JSONObject::card)
+                    collected.addAll(page)
+                    offset += limit
+                    if (page.size < limit || offset >= result.optInt("total", offset)) break
+                }
+                succeeded++
             } catch (e: Exception) {
                 if (firstFailure == null) firstFailure = e
             }
         }
-        if (success == 0) throw (firstFailure ?: IllegalStateException("季度数据获取失败"))
-        return collected.distinctBy { it.id }.sortedByDescending { it.date }
+        if (succeeded == 0) {
+            throw (firstFailure ?: IllegalStateException("季度动画获取失败"))
+        }
+        return SeasonFilter.apply(collected, year, quarter, animeCategory)
     }
 
     suspend fun search(keyword: String, subjectType: Int? = null, offset: Int = 0): List<AnimeCard> {
