@@ -3,6 +3,7 @@ package com.example.bangumioauthdemo
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -64,6 +65,8 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var seasonQuarter by mutableStateOf((LocalDate.now().monthValue - 1) / 3 + 1)
         private set
+    var seasonCategory by mutableIntStateOf(1)
+        private set
     var selectedCollectionType by mutableStateOf<Int?>(null)
         private set
 
@@ -104,15 +107,23 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         loadSeason(force = true)
     }
 
+    fun selectSeasonCategory(category: Int) {
+        if (seasonCategory == category) return
+        require(category in listOf(0, 1, 2, 3, 5))
+        seasonCategory = category
+        loadSeason(force = true)
+    }
+
     fun loadSeason(force: Boolean = false) {
         if ((seasonal.data != null || seasonal.loading) && !force) return
         val year = seasonYear
         val quarter = seasonQuarter
+        val category = seasonCategory
         seasonal = Resource(loading = true)
         viewModelScope.launch {
             try {
-                val result = repo.season(year, quarter)
-                if (seasonYear == year && seasonQuarter == quarter) {
+                val result = repo.season(year, quarter, category)
+                if (seasonYear == year && seasonQuarter == quarter && seasonCategory == category) {
                     seasonal = Resource(data = result)
                 }
             } catch (e: Exception) { seasonal = Resource(error = e.message ?: "季度新番加载失败") }
