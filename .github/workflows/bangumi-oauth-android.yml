@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Install Android SDK 35
         shell: bash
         run: |
@@ -24,10 +24,10 @@ jobs:
           TOOL="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -1)"
           echo "Using $TOOL"
           yes | "$TOOL" --licenses >/dev/null || true
-          "$TOOL" "platforms;android-35" "build-tools;35.0.0"
+          "$TOOL" "platforms;android-37" "build-tools;37.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '9.7.1'
       - name: Generate API catalog from official OpenAPI
         run: |
           python -m pip install --user pyyaml
@@ -41,7 +41,7 @@ jobs:
           sha256sum bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           ls -lh bangumi-oauth-android/app/build/outputs/apk/release
           test -s bangumi-oauth-android/app/build/outputs/mapping/release/mapping.txt
-          "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
+          "${ANDROID_HOME}/build-tools/37.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: bangumi-glass-client-release-apk
