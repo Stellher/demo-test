@@ -175,7 +175,7 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
         loadSubject(id)
     }
 
-    fun loadSubject(id: Int = selectedSubject ?: return) {
+    fun loadSubject(id: Int) {
         subject = Resource(loading = true)
         viewModelScope.launch {
             try {
