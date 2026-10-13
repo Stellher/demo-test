@@ -28,6 +28,23 @@ object SeasonFilter {
         return ((quarter - 1) * 3 + 1)..(quarter * 3)
     }
 
+    /** Only classify known, unambiguous anime platform labels. */
+    fun inferredCategory(platform: String): Int? {
+        val key = platform.trim().lowercase()
+        if (key.isBlank()) return null
+        return when {
+            key == "tv" || key.startsWith("tv ") || key.startsWith("tv(") ||
+                key.startsWith("テレビ") -> 1
+            key == "ova" || key == "oad" || key.startsWith("ova ") ||
+                key.startsWith("oad ") -> 2
+            key == "movie" || key == "映画" || key.contains("剧场版") ||
+                key.contains("劇場版") -> 3
+            key == "web" || key == "ona" || key.startsWith("web ") ||
+                key.startsWith("ona ") -> 5
+            else -> null
+        }
+    }
+
     fun accepted(
         subject: AnimeCard,
         year: Int,
@@ -35,7 +52,12 @@ object SeasonFilter {
         animeCategory: Int?
     ): Boolean {
         if (subject.id <= 0 || subject.category != ANIME) return false
-        if (animeCategory != null && subject.subCategory != animeCategory) return false
+        // Official /v0/subjects filters by `cat` but its Subject schema does not expose cat.
+        // Validate a returned `cat` if provided; otherwise cross-check recognized platforms.
+        if (animeCategory != null) {
+            val responseCat = subject.subCategory ?: inferredCategory(subject.platform)
+            if (responseCat != null && responseCat != animeCategory) return false
+        }
         val parsed = try {
             LocalDate.parse(subject.date.take(10))
         } catch (_: DateTimeParseException) {
