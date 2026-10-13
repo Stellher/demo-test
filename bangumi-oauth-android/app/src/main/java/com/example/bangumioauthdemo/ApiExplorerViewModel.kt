@@ -19,15 +19,16 @@ class ApiExplorerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _selected = MutableStateFlow<ApiEndpoint?>(null)
     val selected = _selected.asStateFlow()
-
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
-
     private val _result = MutableStateFlow<ExplorerResult?>(null)
     val result = _result.asStateFlow()
-
     private val _history = MutableStateFlow<List<ApiHistoryEntry>>(emptyList())
     val history = _history.asStateFlow()
+
+    init {
+        OAuthSessionManager.initialize(app)
+    }
 
     fun select(endpoint: ApiEndpoint) {
         _selected.value = endpoint
@@ -50,14 +51,30 @@ class ApiExplorerViewModel(app: Application) : AndroidViewModel(app) {
         _result.value = null
         viewModelScope.launch {
             try {
-                val value = executor.execute(endpoint, params, body, bearerToken)
-                _result.value = ExplorerResult(endpoint.id, response = value)
+                // Never rely on the token captured in Compose state: it may have been rotated.
+                val token = OAuthSessionManager.ensureValidToken()
+                if (OAuthSessionManager.session.value != null && token == null) {
+                    error("保存的授权无法自动续期：${OAuthSessionManager.refreshState.value.message}")
+                }
+                var result = executor.execute(endpoint, params, body, token)
+                if (result.httpCode == 401 && token != null) {
+                    // Refresh even for rejected write requests, but do not repeat a write.
+                    val newToken = OAuthSessionManager.ensureValidToken(
+                        forceRefresh = true,
+                        failedToken = token
+                    )
+                    val canRetry = !endpoint.mutatesData
+                    if (canRetry && newToken != null && newToken != token) {
+                        result = executor.execute(endpoint, params, body, newToken)
+                    }
+                }
+                _result.value = ExplorerResult(endpoint.id, response = result)
                 _history.value = (
                     listOf(ApiHistoryEntry(
                         label = endpoint.id,
-                        code = value.httpCode,
-                        duration = value.durationMillis,
-                        detail = value.url
+                        code = result.httpCode,
+                        duration = result.durationMillis,
+                        detail = result.url
                     )) + _history.value
                 ).take(30)
             } catch (e: Exception) {
