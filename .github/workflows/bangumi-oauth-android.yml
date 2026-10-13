@@ -1,8 +1,8 @@
-name: Bangumi Glass v2.0.1 Collection Fix
+name: Bangumi Glass v2.3 Liquid UX & Anime Season
 on:
   push:
     branches:
-      - build/bangumi-glass-fix-json415-20261014
+      - build/bangumi-glass-ux-season-v230-20261014
   pull_request:
     branches:
       - main
@@ -46,7 +46,7 @@ jobs:
           "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-201-fix-415-release-apk
+          name: bangumi-glass-230-liquid-ux-release-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
       - name: Add Gradle wrapper to distributable source
@@ -57,6 +57,6 @@ jobs:
             -x "*/build/*" "*/.gradle/*"
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-201-fix-415-android-studio-source
+          name: bangumi-glass-230-liquid-ux-android-studio-source
           path: bangumi-glass-source.zip
           retention-days: 7
