@@ -238,7 +238,7 @@ class BangumiViewModel(app: Application) : AndroidViewModel(app) {
                 val items = data.optJSONArray("data")?.objects().orEmpty()
                 if (selectedId == id) progressIds = items.filter {
                     it.optInt("type") >= 2
-                }.map { it.optInt("episode_id") }.toSet()
+                }.map { it.optJSONObject("episode")?.optInt("id") ?: it.optInt("episode_id") }.toSet()
             }
         }
     }
@@ -281,6 +281,8 @@ class BangumiViewModel(app: Application) : AndroidViewModel(app) {
             toast(if (add) "人物已收藏" else "已取消收藏")
         }
     }
+
+    fun closeIndex() { openedIndex = null }
 
     fun showIndex(id: Int) {
         if (id <= 0) return
