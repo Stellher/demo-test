@@ -115,7 +115,8 @@ class BangumiRepository {
         for (month in startMonth until startMonth + 3) {
             var offset = 0
             // Bounded pagination; do not silently present other quarters as new anime.
-            repeat(4) {
+            var pageIndex = 0
+            while (pageIndex < 4) {
                 try {
                     val page = objectResponse("/v0/subjects", mapOf(
                         "type" to "2",
@@ -142,10 +143,11 @@ class BangumiRepository {
                         }
                     }
                     offset += page.size
-                    if (page.size < 60) return@repeat
+                    pageIndex++
+                    if (page.size < 60) break
                 } catch (e: Exception) {
                     if (firstFailure == null) firstFailure = e
-                    return@repeat
+                    break
                 }
             }
         }
