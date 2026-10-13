@@ -77,55 +77,7 @@ fun LiquidNavigation(
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val names = listOf("发现", "放送", "季度", "收藏", "我的")
-    val icons = listOf(
-        Icons.Outlined.Home,
-        Icons.Outlined.CalendarMonth,
-        Icons.Outlined.Explore,
-        Icons.Outlined.BookmarkBorder,
-        Icons.Outlined.PersonOutline
-    )
-    Row(
-        modifier = modifier
-            .padding(horizontal = 15.dp, vertical = 8.dp)
-            .shadow(14.dp, RoundedCornerShape(32.dp), ambientColor = Blue.copy(alpha = 0.1f))
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { RoundedCornerShape(32.dp) },
-                effects = {
-                    vibrancy()
-                    blur(5.dp.toPx())
-                    if (android.os.Build.VERSION.SDK_INT >= 33) lens(12.dp.toPx(), 16.dp.toPx())
-                },
-                onDrawSurface = { drawRect(Color(0xDAFFFFFF)) }
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(32.dp))
-            .padding(horizontal = 6.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        names.forEachIndexed { index, label ->
-            Column(
-                Modifier.weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(
-                        if (selected == index) Color(0xFFE0E8FF).copy(alpha = .86f)
-                        else Color.Transparent
-                    )
-                    .clickable { onSelected(index) }
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Icon(icons[index], contentDescription = label,
-                    tint = if (selected == index) Blue else Slate,
-                    modifier = Modifier.size(22.dp))
-                Text(label, fontWeight = if (selected == index) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected == index) Blue else Slate,
-                    style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
+    LiquidDock(backdrop, selected, onSelected, modifier)
 }
 
 @Composable
@@ -150,24 +102,14 @@ fun SectionTitle(title: String, subtitle: String? = null, action: String? = null
             if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Slate)
         }
         if (action != null && onClick != null) {
-            TextButton(onClick = onClick) { Text(action, color = Blue) }
+            GlassAction(text = action, onClick = onClick, icon = Icons.Outlined.ChevronRight)
         }
     }
 }
 
 @Composable
 fun SoftChip(text: String, selected: Boolean = false, onClick: () -> Unit) {
-    Box(
-        Modifier.clip(RoundedCornerShape(100))
-            .background(if (selected) Ink else Color.White.copy(alpha = .92f))
-            .border(1.dp, if (selected) Ink else Line, RoundedCornerShape(100))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp)
-    ) {
-        Text(text, color = if (selected) Color.White else Ink,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-    }
+    GlassSelectionChip(text = text, selected = selected, onClick = onClick)
 }
 
 @Composable
@@ -283,7 +225,7 @@ fun StatusMessage(
         ) {
             Icon(Icons.Outlined.CloudOff, null, tint = Slate, modifier = Modifier.size(38.dp))
             Text(error, color = Slate, style = MaterialTheme.typography.bodyMedium)
-            if (onRetry != null) OutlinedButton(onClick = onRetry) { Text("重试") }
+            if (onRetry != null) GlassAction("重试", onClick = onRetry, icon = Icons.Outlined.Refresh)
         }
         empty -> Text("暂时没有符合条件的内容", color = Slate,
             modifier = Modifier.fillMaxWidth().padding(24.dp),
