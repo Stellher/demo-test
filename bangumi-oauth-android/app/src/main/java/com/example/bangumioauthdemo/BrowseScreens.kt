@@ -171,20 +171,21 @@ private fun QuickAction(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier.clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = .82f))
-            .border(1.dp, Line, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick).padding(15.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+    LiquidAction(
+        onClick = onClick,
+        modifier = modifier.height(94.dp),
+        radius = 24.dp,
+        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 12.dp)
     ) {
         Text(emoji, style = MaterialTheme.typography.headlineSmall)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.Bold, color = Ink,
                 style = MaterialTheme.typography.titleSmall)
             Text(subtitle, color = Slate, style = MaterialTheme.typography.labelSmall)
         }
+        Icon(Icons.Outlined.ChevronRight, null,
+            tint = Blue, modifier = Modifier.size(18.dp))
     }
 }
 
