@@ -255,7 +255,7 @@ fun PersonPage(vm: BangumiBrowseViewModel, back: () -> Unit) {
             .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        IconButton(onClick = back) { Icon(Icons.Outlined.ArrowBack, "返回条目", tint = Ink) }
+        LiquidIconAction(Icons.Outlined.ArrowBack, "返回条目", onClick = back)
         if (data.data == null) {
             StatusMessage(data.loading, data.error, false)
             return@Column
