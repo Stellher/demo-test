@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.bangumioauthdemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "2.0.1"
+        versionCode = 6
+        versionName = "2.1.0"
         buildConfigField("String", "BGM_CLIENT_ID", "\"bgm72976ace318d39b25\"")
     }
     buildFeatures { compose = true; buildConfig = true }
