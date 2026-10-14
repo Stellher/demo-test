@@ -1,8 +1,8 @@
-name: Bangumi Glass Seasonal Filter + UX
+name: Bangumi Glass Liquid UX Release 2.1.0
 on:
   push:
     branches:
-      - build/bangumi-season-glass-ux-20261014
+      - build/bangumi-glass-complete-ux-20261014
   pull_request:
     branches:
       - main
@@ -46,7 +46,7 @@ jobs:
           "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-season-ux-release-apk
+          name: bangumi-glass-ux-v210-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
       - name: Add Gradle wrapper to distributable source
@@ -57,6 +57,6 @@ jobs:
             -x "*/build/*" "*/.gradle/*"
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-season-ux-android-studio-source
+          name: bangumi-glass-ux-v210-source
           path: bangumi-glass-source.zip
           retention-days: 7
