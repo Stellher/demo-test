@@ -16,6 +16,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,6 +70,7 @@ private fun BangumiHomeApp(
     // Separate capture layers prevent nested glass from sampling itself.
     val wallpaperBackdrop = rememberLayerBackdrop()
     val snackHost = remember { SnackbarHostState() }
+    val pageStateHolder = rememberSaveableStateHolder()
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var seasonFiltersOpen by remember { mutableStateOf(false) }
@@ -152,6 +154,7 @@ private fun BangumiHomeApp(
                         },
                         label = "bangumiGlassNavigation"
                     ) { route ->
+                        pageStateHolder.SaveableStateProvider(route) {
                         when {
                             route.startsWith("person:") -> PersonPage(
                                 vm = vm, back = { vm.closePerson() }
@@ -196,6 +199,7 @@ private fun BangumiHomeApp(
                                 onOpenApiLab = openOAuthLab,
                                 onOpenSearch = { searchOpen = true }
                             )
+                        }
                         }
                     }
                 }
