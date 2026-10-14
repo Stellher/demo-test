@@ -95,7 +95,7 @@ fun LiquidAction(
             modifier = modifier.alpha(if (enabled) 1f else 0.45f),
             isInteractive = enabled,
             // The official component uses blend-mode Hue for tint.
-            tint = if (selected) Blue else Color.Unspecified,
+            tint = if (selected) Color(0xFF0088FF) else Color.Unspecified,
             surfaceColor = if (selected) Color.Unspecified else Color.White.copy(alpha = .24f),
             content = content
         )
@@ -129,7 +129,7 @@ fun LiquidIconAction(
         radius = 23.dp,
         contentPadding = PaddingValues(0.dp)
     ) {
-        Icon(icon, description, tint = if (selected) Blue else Ink,
+        Icon(icon, description, tint = if (selected) Color.White else Ink,
             modifier = Modifier.size(22.dp))
     }
 }
@@ -150,7 +150,7 @@ fun LiquidTextAction(
             Spacer(Modifier.width(7.dp))
         }
         Text(text, fontWeight = FontWeight.SemiBold,
-            color = if (selected) Blue else Ink,
+            color = if (selected) Color.White else Ink,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
