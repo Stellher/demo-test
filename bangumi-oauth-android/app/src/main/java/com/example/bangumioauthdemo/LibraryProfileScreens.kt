@@ -48,12 +48,7 @@ fun LibraryPage(
         verticalArrangement = Arrangement.spacedBy(13.dp)
     ) {
         item {
-            PageTitle("YOUR LIBRARY", "我的追番与收藏", "让每一部作品都有自己的位置") {
-                LiquidIconAction(
-                    Icons.Outlined.Refresh, "刷新收藏",
-                    onClick = { vm.loadLibrary(force = true) }
-                )
-            }
+            PageTitle("YOUR LIBRARY", "我的追番与收藏", "让每一部作品都有自己的位置")
         }
         if (account == null) {
             item {
