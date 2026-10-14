@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 /** One single floating sheet replaces the opaque AlertDialog collection form. */
 @Composable
@@ -70,34 +71,30 @@ fun GlassCollectionEditor(
                     color = Blue
                 )
             }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LiquidIconAction(Icons.Outlined.Remove, "减少评分",
-                    onClick = { rating = (rating - 1).coerceAtLeast(0) },
-                    modifier = Modifier.size(40.dp))
-                for (i in 1..5) {
-                    LiquidAction(
-                        onClick = { rating = i * 2 },
-                        modifier = Modifier.weight(1f).height(47.dp),
-                        radius = 15.dp,
-                        selected = rating >= i * 2,
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Icon(
-                            if (rating >= i * 2) Icons.Outlined.Star
-                            else Icons.Outlined.StarBorder,
-                            "评分 ${i * 2}",
-                            tint = if (rating >= i * 2) Color(0xFFE3A63D) else Slate,
-                            modifier = Modifier.size(21.dp)
-                        )
-                    }
-                }
-                LiquidIconAction(Icons.Outlined.Add, "增加评分",
-                    onClick = { rating = (rating + 1).coerceAtMost(10) },
-                    modifier = Modifier.size(40.dp))
+            val glass = LocalGlassBackdrop.current
+            if (glass != null) {
+                com.kyant.backdrop.catalog.components.LiquidSlider(
+                    value = { rating.toFloat() },
+                    onValueChange = { rating = it.roundToInt().coerceIn(0, 10) },
+                    valueRange = 0f..10f,
+                    visibilityThreshold = 0.01f,
+                    backdrop = glass,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Slider(
+                    value = rating.toFloat(),
+                    onValueChange = { rating = it.roundToInt().coerceIn(0, 10) },
+                    valueRange = 0f..10f
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                LiquidTextAction(
+                    text = "− 1", onClick = { rating = (rating - 1).coerceAtLeast(0) }
+                )
+                LiquidTextAction(
+                    text = "+ 1", onClick = { rating = (rating + 1).coerceAtMost(10) }
+                )
             }
             SheetLabel("个人标签", "使用中文或英文逗号分隔；标签内部不能有空格")
             OutlinedTextField(
@@ -119,12 +116,25 @@ fun GlassCollectionEditor(
                 colors = glassFieldColors()
             )
             SheetLabel("可见范围", "私人收藏仅自己可见")
-            LiquidSegmented(
-                titles = listOf("公开收藏", "仅自己可见"),
-                selectedIndex = if (isPrivate) 1 else 0,
-                onSelected = { isPrivate = it == 1 },
-                compact = true
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    if (isPrivate) "私密收藏" else "公开收藏",
+                    color = Ink, style = MaterialTheme.typography.bodyMedium
+                )
+                if (glass != null) {
+                    com.kyant.backdrop.catalog.components.LiquidToggle(
+                        selected = { isPrivate },
+                        onSelect = { isPrivate = it },
+                        backdrop = glass
+                    )
+                } else {
+                    Switch(checked = isPrivate, onCheckedChange = { isPrivate = it })
+                }
+            }
             Text("保存后会真实修改 Bangumi 账户中的收藏资料。",
                 color = Slate, style = MaterialTheme.typography.bodySmall)
         }
