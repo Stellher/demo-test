@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.bangumioauthdemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "2.1.0"
+        versionCode = 7
+        versionName = "2.2.0"
         buildConfigField("String", "BGM_CLIENT_ID", "\"bgm72976ace318d39b25\"")
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -44,6 +44,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("io.github.kyant0:backdrop:1.0.0")
+    implementation("io.github.kyant0:capsule:2.1.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
