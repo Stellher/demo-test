@@ -222,7 +222,10 @@ fun CalendarPage(vm: BangumiBrowseViewModel, openSubject: (Int) -> Unit) {
             items(shows, key = { it.id }) { item -> AnimeListRow(item, { openSubject(item.id) }) }
         }
         item {
-            TextButton(onClick = { vm.loadCalendar(true) }) { Text("刷新放送日历") }
+            LiquidTextAction(
+                "刷新放送日历", onClick = { vm.loadCalendar(true) },
+                icon = Icons.Outlined.Refresh
+            )
         }
     }
 }
