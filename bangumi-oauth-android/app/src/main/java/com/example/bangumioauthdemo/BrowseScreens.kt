@@ -48,12 +48,7 @@ fun DiscoverPage(
         verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
         item {
-            PageTitle("ANIME DISCOVERY", "发现好作品", "每一天都值得期待一部好动画") {
-                LiquidIconAction(
-                    Icons.Outlined.Search, "搜索 Bangumi",
-                    onClick = openSearch
-                )
-            }
+            PageTitle("ANIME DISCOVERY", "发现好作品", "每一天都值得期待一部好动画")
         }
         item {
             val featured = trending.data?.firstOrNull()
@@ -252,11 +247,7 @@ fun SeasonPage(
                 eyebrow = "SEASONAL PREMIERES",
                 title = "本季新番",
                 subtitle = "严格筛选条目类型、首播日期与放送形式"
-            ) {
-                LiquidIconAction(
-                    Icons.Outlined.Tune, "高级筛选", onClick = openFilters
-                )
-            }
+            )
             Spacer(Modifier.height(16.dp))
             LiquidGlassPanel(Modifier.fillMaxWidth()) {
                 Row(
