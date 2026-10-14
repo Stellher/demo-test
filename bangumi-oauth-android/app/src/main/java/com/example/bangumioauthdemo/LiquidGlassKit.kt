@@ -460,7 +460,7 @@ fun LiquidBottomSheet(
         exit = fadeOut() + slideOutVertically(
             targetOffsetY = { it }, animationSpec = spring(dampingRatio = 1f)
         ),
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize().imePadding()
     ) {
         Box(Modifier.fillMaxSize()) {
             Box(
