@@ -1,5 +1,7 @@
 package com.example.bangumioauthdemo
 
+import com.kyant.backdrop.catalog.components.LiquidBottomTab
+
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -197,7 +199,7 @@ fun LiquidSegmented(
         modifier = modifier.fillMaxWidth()
     ) {
         titles.forEachIndexed { index, title ->
-            com.kyant.backdrop.catalog.components.LiquidBottomTab(
+            LiquidBottomTab(
                 onClick = { onSelected(index) }
             ) {
                 Text(
