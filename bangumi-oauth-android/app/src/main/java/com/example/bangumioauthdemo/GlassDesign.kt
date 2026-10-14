@@ -1,5 +1,7 @@
 package com.example.bangumioauthdemo
 
+import com.kyant.backdrop.catalog.components.LiquidBottomTab
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -122,7 +124,7 @@ fun LiquidNavigation(
         modifier = modifier.padding(horizontal = 15.dp, vertical = 7.dp)
     ) {
         names.forEachIndexed { index, label ->
-            com.kyant.backdrop.catalog.components.LiquidBottomTab(
+            LiquidBottomTab(
                 onClick = { onSelected(index) }
             ) {
                 Icon(
