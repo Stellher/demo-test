@@ -170,10 +170,10 @@ fun GlassCollectionEditor(
                     Spacer(Modifier.width(8.dp))
                 }
                 Icon(Icons.Outlined.CloudUpload, null,
-                    tint = Blue, modifier = Modifier.size(19.dp))
+                    tint = Color.White, modifier = Modifier.size(19.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (busy) "正在保存…" else "保存到 Bangumi",
-                    fontWeight = FontWeight.Bold, color = Blue)
+                    fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
