@@ -106,8 +106,6 @@ class BangumiRepository {
     suspend fun season(year: Int, quarter: Int, animeCategory: Int = 1): List<AnimeCard> {
         val selected = quarter.coerceIn(1, 4)
         val startMonth = (selected - 1) * 3 + 1
-        val firstDay = LocalDate.of(year, startMonth, 1)
-        val lastDayExclusive = firstDay.plusMonths(3)
         val collected = LinkedHashMap<Int, AnimeCard>()
         var success = 0
         var firstFailure: Exception? = null
@@ -133,20 +131,14 @@ class BangumiRepository {
                         // supplies type=2 as a fallback when it is absent.
                         if (raw.optInt("type", -1) != 2) return@forEach
                         val item = raw.card()
-                        val releaseDate = runCatching {
-                            LocalDate.parse(item.date.take(10))
-                        }.getOrNull()
-                        val platform = raw.optString("platform", "").trim().lowercase()
-                        val categoryMatches = when (animeCategory) {
-                            1 -> platform == "tv"
-                            2 -> platform == "ova"
-                            3 -> platform in setOf("movie", "剧场版")
-                            5 -> platform in setOf("web", "web animation", "网络动画")
-                            else -> true
-                        }
-                        if (item.id > 0 && releaseDate != null && categoryMatches &&
-                            !releaseDate.isBefore(firstDay) &&
-                            releaseDate.isBefore(lastDayExclusive)
+                        if (item.id > 0 && SeasonMatcher.matches(
+                                subjectType = raw.optInt("type", -1),
+                                airDate = item.date,
+                                platform = raw.optString("platform", ""),
+                                year = year,
+                                quarter = selected,
+                                category = animeCategory
+                            )
                         ) {
                             collected[item.id] = item
                         }
