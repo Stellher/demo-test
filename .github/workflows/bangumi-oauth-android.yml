@@ -72,31 +72,25 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Download verified Release APK for emulator
+        uses: actions/download-artifact@v4
         with:
-          gradle-version: '8.11.1'
-      - name: Install SDK36 for compilation
-        shell: bash
-        run: |
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          TOOL="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -1)"
-          yes | "$TOOL" --licenses >/dev/null || true
-          "$TOOL" "platforms;android-36" "build-tools;36.0.0"
+          name: bangumi-kyant-official-v220-apk
+          path: emulator_apk
       - name: Allow emulator hardware acceleration
         run: sudo chmod 666 /dev/kvm || true
       - name: Pixel 6 glass UX screenshots
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
-          target: google_apis
+          target: default
           arch: x86_64
           profile: pixel_6
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
             set -eu
-            gradle --no-daemon -p bangumi-oauth-android :app:assembleDebug
-            adb install -r bangumi-oauth-android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r emulator_apk/app-release.apk
             adb shell wm size 1080x2400
             adb shell wm density 420
             adb shell am start -n com.example.bangumioauthdemo/.BangumiHomeActivity
