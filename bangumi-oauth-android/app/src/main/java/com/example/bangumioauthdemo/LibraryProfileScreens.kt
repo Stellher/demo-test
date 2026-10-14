@@ -72,14 +72,16 @@ fun LibraryPage(
             }
         } else {
             item {
-                Row(Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    collectionLabels.forEach { (type, label) ->
-                        SoftChip(label, vm.selectedCollectionType == type) {
-                            vm.selectCollectionType(type)
-                        }
-                    }
-                }
+                LiquidSegmented(
+                    titles = collectionLabels.map { it.second },
+                    selectedIndex = collectionLabels.indexOfFirst {
+                        it.first == vm.selectedCollectionType
+                    }.coerceAtLeast(0),
+                    onSelected = {
+                        vm.selectCollectionType(collectionLabels[it].first)
+                    },
+                    compact = true
+                )
             }
             item {
                 val count = library.data?.size
@@ -237,23 +239,27 @@ private fun ProfileAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(19.dp))
-            .background(Color.White.copy(alpha = .89f))
-            .border(1.dp, Line, RoundedCornerShape(19.dp))
-            .clickable(onClick = onClick).padding(15.dp),
-        horizontalArrangement = Arrangement.spacedBy(15.dp),
-        verticalAlignment = Alignment.CenterVertically
+    LiquidAction(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(85.dp),
+        radius = 23.dp,
+        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 13.dp)
     ) {
-        Box(Modifier.size(46.dp).background(Color(0xFFEFF2FC), RoundedCornerShape(15.dp)),
-            contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = Blue)
+        Box(
+            Modifier.size(47.dp)
+                .background(Color(0x77E6EEFF), RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = Blue, modifier = Modifier.size(22.dp))
         }
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, color = Ink, style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold)
-            Text(description, color = Slate, style = MaterialTheme.typography.bodySmall)
+            Text(description, color = Slate, style = MaterialTheme.typography.bodySmall,
+                maxLines = 1)
         }
-        Icon(Icons.Outlined.ChevronRight, null, tint = Slate)
+        Icon(Icons.Outlined.ChevronRight, null, tint = Blue,
+            modifier = Modifier.size(20.dp))
     }
 }
