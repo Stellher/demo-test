@@ -66,6 +66,8 @@ private fun BangumiHomeApp(
         drawRect(Pale)
         drawContent()
     }
+    // Separate capture layers prevent nested glass from sampling itself.
+    val wallpaperBackdrop = rememberLayerBackdrop()
     val snackHost = remember { SnackbarHostState() }
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -113,14 +115,18 @@ private fun BangumiHomeApp(
     }
 
     CompositionLocalProvider(
-        LocalGlassBackdrop provides backdrop,
         LocalAnimePreviewHandler provides { item: AnimeCard ->
             quickPreview = item
         }
     ) {
         Box(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                GlassBackdropBackground()
+                Box(Modifier.fillMaxSize().layerBackdrop(wallpaperBackdrop)) {
+                    GlassBackdropBackground()
+                }
+                // Inline controls sample ONLY wallpaperBackdrop. The page
+                // capture can include these without recursive glass feedback.
+                CompositionLocalProvider(LocalGlassBackdrop provides wallpaperBackdrop) {
                 Box(
                     Modifier.fillMaxSize().statusBarsPadding()
                         .padding(top = if (overlay) 0.dp else 72.dp)
@@ -193,8 +199,12 @@ private fun BangumiHomeApp(
                         }
                     }
                 }
+                }
             }
 
+            // Floating bars sample pageBackdrop. Sheets use exportedBackdrop
+            // for a safe second layer (never capture their own glass).
+            CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
             // Foreground layers intentionally live outside layerBackdrop.
             if (!overlay) {
                 LiquidTopBar(
@@ -291,6 +301,7 @@ private fun BangumiHomeApp(
                     }
                 }
             )
+            }
         }
     }
 }
