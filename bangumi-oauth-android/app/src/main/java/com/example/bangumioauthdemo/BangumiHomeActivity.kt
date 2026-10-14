@@ -93,7 +93,9 @@ private fun BangumiHomeApp(
     BackHandler(enabled = overlay || currentTab != 0) { back() }
 
     // Reset collection sheet when moving to a different title.
-    LaunchedEffect(subjectId) { collectionEditorOpen = false }
+    LaunchedEffect(subjectId) {
+        if (subjectId == null) collectionEditorOpen = false
+    }
     val feedback = vm.actionFeedback
     LaunchedEffect(feedback) {
         if (feedback != null) {
