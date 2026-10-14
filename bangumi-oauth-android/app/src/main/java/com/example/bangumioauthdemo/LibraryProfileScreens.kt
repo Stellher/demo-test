@@ -49,9 +49,10 @@ fun LibraryPage(
     ) {
         item {
             PageTitle("YOUR LIBRARY", "我的追番与收藏", "让每一部作品都有自己的位置") {
-                IconButton(onClick = { vm.loadLibrary(true) }) {
-                    Icon(Icons.Outlined.Refresh, "刷新收藏", tint = Ink)
-                }
+                LiquidIconAction(
+                    Icons.Outlined.Refresh, "刷新收藏",
+                    onClick = { vm.loadLibrary(force = true) }
+                )
             }
         }
         if (account == null) {
@@ -67,7 +68,11 @@ fun LibraryPage(
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("登录后可查看想看、在看、看过的作品，并从详情页修改评分和进度。",
                         color = Slate, style = MaterialTheme.typography.bodyMedium)
-                    Button(onClick = onLogin, shape = RoundedCornerShape(16.dp)) { Text("登录 Bangumi") }
+                    LiquidTextAction(
+                        text = "登录 Bangumi", onClick = onLogin,
+                        selected = true, icon = Icons.Outlined.Login,
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                    )
                 }
             }
         } else {
@@ -150,9 +155,13 @@ fun ProfilePage(
                     Text("同步收藏、评分与章节进度，并自动维护 OAuth 授权。",
                         color = Color.White.copy(alpha = .85f),
                         style = MaterialTheme.typography.bodyMedium)
-                    Button(onClick = onLogin, colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White, contentColor = Ink
-                    ), shape = RoundedCornerShape(15.dp)) { Text("前往 OAuth 授权") }
+                    LiquidTextAction(
+                        text = "连接 Bangumi OAuth",
+                        onClick = onLogin,
+                        selected = true,
+                        icon = Icons.Outlined.Login,
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    )
                 }
             } else {
                 Row(
@@ -208,7 +217,10 @@ fun ProfilePage(
                         .coerceAtLeast(0L) / 3600_000L
                     Text("当前 Token 剩余约 " + remaining + " 小时 · 加密存储",
                         color = Blue, style = MaterialTheme.typography.labelSmall)
-                    TextButton(onClick = onLogin) { Text("管理 OAuth · 手动刷新 · 退出授权") }
+                    LiquidTextAction(
+                        "管理 OAuth · 自动续期", onClick = onLogin,
+                        icon = Icons.Outlined.Security
+                    )
                 }
             }
         }
