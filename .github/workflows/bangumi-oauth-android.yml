@@ -111,6 +111,14 @@ jobs:
             adb shell input tap 950 2100
             sleep 4
             adb exec-out screencap -p > ux_screenshots/05-profile.png
+            # Exercise Kyant's real press+drag indicator while capturing its
+            # live refraction, not a synthesized static hover screenshot.
+            adb shell input swipe 100 2100 790 2100 1100 &
+            sleep 0.5
+            adb exec-out screencap -p > ux_screenshots/06-kyant-drag-frame.png
+            wait
+            sleep 2
+            adb exec-out screencap -p > ux_screenshots/07-after-drag.png
             adb logcat -d -v time > ux_screenshots/logcat.txt
             adb shell pidof com.example.bangumioauthdemo
       - uses: actions/upload-artifact@v4
