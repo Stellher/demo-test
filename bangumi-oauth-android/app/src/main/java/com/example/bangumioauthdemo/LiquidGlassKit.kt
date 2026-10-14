@@ -48,6 +48,8 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.colorControls
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
@@ -344,28 +346,32 @@ fun LiquidBottomSheet(
                         indication = null
                     ) { onDismiss() }
             )
-            val shape = RoundedCornerShape(topStart = 33.dp, topEnd = 33.dp)
+            val shape = ContinuousRoundedRectangle(48.dp)
             val surface = if (backdrop == null) {
-                Modifier.background(Color(0xFFF0F4FF), shape)
+                Modifier.background(Color(0x99FAFAFA), shape)
             } else {
                 Modifier.drawBackdrop(
                     backdrop = backdrop,
                     exportedBackdrop = sheetBackdrop,
                     shape = { shape },
+                    // Adapted DIRECTLY from Kyant Catalog's DialogContent:
+                    // ContinuousRoundedRectangle(48dp), colorControls,
+                    // 16dp blur, deep refraction and Highlight.Plain.
                     effects = {
-                        vibrancy()
+                        colorControls(brightness = .20f, saturation = 1.5f)
                         blur(16.dp.toPx())
-                        lens(18.dp.toPx(), 24.dp.toPx(), chromaticAberration = true)
+                        lens(24.dp.toPx(), 48.dp.toPx(), depthEffect = true)
                     },
-                    highlight = { Highlight.Default.copy(alpha = .6f) },
+                    highlight = { Highlight.Plain },
                     shadow = { Shadow(radius = 20.dp, alpha = .25f) },
-                    onDrawSurface = { drawRect(Color(0xDFFBFCFF)) }
+                    onDrawSurface = { drawRect(Color(0x99FAFAFA)) }
                 )
             }
             Column(
                 Modifier.align(Alignment.BottomCenter)
                     .offset { IntOffset(0, drag.roundToInt()) }
                     .fillMaxWidth()
+                    .padding(horizontal = 15.dp, vertical = 12.dp)
                     .navigationBarsPadding()
                     .heightIn(max = 720.dp)
                     .shadow(20.dp, shape)
