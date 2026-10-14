@@ -1,8 +1,8 @@
-name: Bangumi Glass Liquid UX Release 2.1.0
+name: Bangumi Glass Official Kyant Components 2.2.0
 on:
   push:
     branches:
-      - build/bangumi-glass-complete-ux-20261014
+      - build/bangumi-kyant-official-components-20261014
   pull_request:
     branches:
       - main
@@ -46,7 +46,7 @@ jobs:
           "${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --print-certs bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-ux-v210-apk
+          name: bangumi-kyant-official-v220-apk
           path: bangumi-oauth-android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
       - name: Add Gradle wrapper to distributable source
@@ -57,7 +57,7 @@ jobs:
             -x "*/build/*" "*/.gradle/*"
       - uses: actions/upload-artifact@v4
         with:
-          name: bangumi-glass-ux-v210-source
+          name: bangumi-kyant-official-v220-source
           path: bangumi-glass-source.zip
           retention-days: 7
   emulator-ux:
@@ -122,6 +122,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bangumi-glass-v210-emulator-screenshots
+          name: bangumi-kyant-official-v220-emulator-screenshots
           path: ux_screenshots/
           retention-days: 7
