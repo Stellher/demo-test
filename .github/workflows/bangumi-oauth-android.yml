@@ -60,3 +60,68 @@ jobs:
           name: bangumi-glass-ux-v210-source
           path: bangumi-glass-source.zip
           retention-days: 7
+  emulator-ux:
+    needs: android-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install SDK36 for compilation
+        shell: bash
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          TOOL="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -1)"
+          yes | "$TOOL" --licenses >/dev/null || true
+          "$TOOL" "platforms;android-36" "build-tools;36.0.0"
+      - name: Allow emulator hardware acceleration
+        run: sudo chmod 666 /dev/kvm || true
+      - name: Pixel 6 glass UX screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euxo pipefail
+            gradle --no-daemon -p bangumi-oauth-android :app:assembleDebug
+            adb install -r bangumi-oauth-android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell wm size 1080x2400
+            adb shell wm density 420
+            adb shell am start -n com.example.bangumioauthdemo/.BangumiHomeActivity
+            sleep 18
+            mkdir -p ux_screenshots
+            adb exec-out screencap -p > ux_screenshots/01-home.png
+            adb shell input tap 550 2250
+            sleep 14
+            adb exec-out screencap -p > ux_screenshots/02-season-tv.png
+            adb shell input tap 970 170
+            sleep 3
+            adb exec-out screencap -p > ux_screenshots/03-glass-filter-sheet.png
+            adb shell input keyevent KEYCODE_BACK
+            sleep 2
+            adb shell input tap 335 2250
+            sleep 14
+            adb exec-out screencap -p > ux_screenshots/04-calendar.png
+            adb shell input tap 975 2250
+            sleep 4
+            adb exec-out screencap -p > ux_screenshots/05-profile.png
+            adb logcat -d -v time > ux_screenshots/logcat.txt
+            adb shell pidof com.example.bangumioauthdemo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bangumi-glass-v210-emulator-screenshots
+          path: ux_screenshots/
+          retention-days: 7
