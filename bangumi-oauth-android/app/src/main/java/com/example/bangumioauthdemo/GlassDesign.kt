@@ -91,11 +91,13 @@ fun GlassBackdropBackground() {
 }
 
 /**
- * Kyant-style floating navigation:
- * - two non-recursive backdrop layers (track, tab icons)
- * - movable refractive glass thumb with chromatic aberration
- * - drag across tabs with haptic selection and spring interpolation
- * - pressure/drag-dependent stretch handled IN drawBackdrop.layerBlock
+ * The official Kyant0/AndroidLiquidGlass v1.0.0 Catalog navigation.
+ * The actual track, thumb, drag resistance, highlight shader, refraction,
+ * velocity-dependent shape and chromatic aberration are entirely implemented
+ * by Kyant's UNMODIFIED LiquidBottomTabs and LiquidBottomTab sources.
+ *
+ * Reference:
+ * https://github.com/Kyant0/AndroidLiquidGlass/blob/1.0.0/catalog/src/main/java/com/kyant/backdrop/catalog/components/LiquidBottomTabs.kt
  */
 @Composable
 fun LiquidNavigation(
@@ -112,136 +114,29 @@ fun LiquidNavigation(
         Icons.Outlined.BookmarkBorder,
         Icons.Outlined.PersonOutline
     )
-    val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-    val railBackdrop = rememberLayerBackdrop()
-    var dragPx by remember { mutableFloatStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    val interactionSources = remember { List(5) { MutableInteractionSource() } }
-    val selectedPressed by interactionSources[selected.coerceIn(0, 4)].collectIsPressedAsState()
-    val press by animateFloatAsState(
-        if (isDragging || selectedPressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = .66f, stiffness = 310f),
-        label = "navGlassPress"
-    )
-    BoxWithConstraints(
-        modifier.padding(horizontal = 13.dp, vertical = 7.dp)
-            .shadow(17.dp, RoundedCornerShape(36.dp),
-                ambientColor = Blue.copy(alpha = .16f))
-            .height(75.dp)
+    com.kyant.backdrop.catalog.components.LiquidBottomTabs(
+        selectedTabIndex = { selected.coerceIn(0, names.lastIndex) },
+        onTabSelected = onSelected,
+        backdrop = backdrop,
+        tabsCount = names.size,
+        modifier = modifier.padding(horizontal = 15.dp, vertical = 7.dp)
     ) {
-        val cellWidth = (maxWidth - 14.dp) / names.size
-        val cellPx = with(density) { cellWidth.toPx() }
-        val selectedPosition by animateDpAsState(
-            cellWidth * selected.coerceIn(0, names.lastIndex),
-            spring(dampingRatio = .73f, stiffness = 380f),
-            label = "navThumbPosition"
-        )
-        Box(
-            Modifier.fillMaxSize().drawBackdrop(
-                backdrop = backdrop,
-                shape = { RoundedCornerShape(36.dp) },
-                effects = {
-                    vibrancy()
-                    blur(9.dp.toPx())
-                    lens(21.dp.toPx(), 21.dp.toPx())
-                },
-                highlight = { Highlight.Default.copy(alpha = .35f) },
-                shadow = { Shadow(radius = 10.dp, alpha = .20f) },
-                onDrawSurface = { drawRect(Color(0xB9FFFFFF)) }
-            )
-                .border(1.dp, Color.White.copy(.9f), RoundedCornerShape(36.dp))
-        )
-        // Record the track separately. Combined thumb does not capture itself.
-        Box(
-            Modifier.fillMaxSize().alpha(0f).layerBackdrop(railBackdrop)
-                .background(Color(0x66E1E9FA), RoundedCornerShape(36.dp))
-        )
-        Box(
-            Modifier.padding(7.dp)
-                .offset(x = selectedPosition + with(density) { dragPx.toDp() })
-                .width(cellWidth).height(61.dp)
-                .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(backdrop, railBackdrop),
-                    shape = { RoundedCornerShape(28.dp) },
-                    effects = {
-                        vibrancy()
-                        blur((3f + press * 1f).dp.toPx())
-                        lens(
-                            (11f + press * 6f).dp.toPx(),
-                            (16f + press * 8f).dp.toPx(),
-                            chromaticAberration = press > .03f
-                        )
-                    },
-                    highlight = {
-                        Highlight.Default.copy(alpha = .4f + .55f * press)
-                    },
-                    shadow = { Shadow(radius = 9.dp, alpha = .4f) },
-                    innerShadow = {
-                        InnerShadow(radius = 8.dp * press, alpha = .7f * press)
-                    },
-                    layerBlock = {
-                        scaleX = 1f + .21f * press
-                        scaleY = 1f - .10f * press
-                    },
-                    onDrawSurface = {
-                        drawRect(Color(0xBBDDE8FF))
-                    }
+        names.forEachIndexed { index, label ->
+            com.kyant.backdrop.catalog.components.LiquidBottomTab(
+                onClick = { onSelected(index) }
+            ) {
+                Icon(
+                    imageVector = icons[index],
+                    contentDescription = label,
+                    tint = Ink,
+                    modifier = Modifier.size(25.dp)
                 )
-                .border(1.dp, Color.White.copy(.90f), RoundedCornerShape(28.dp))
-        )
-        Row(
-            Modifier.fillMaxSize().padding(7.dp)
-                .pointerInput(selected, cellPx) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { isDragging = true },
-                        onDragEnd = {
-                            val index = (selected + (dragPx / cellPx).roundToInt())
-                                .coerceIn(0, names.lastIndex)
-                            dragPx = 0f
-                            isDragging = false
-                            if (index != selected) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelected(index)
-                            }
-                        },
-                        onDragCancel = { dragPx = 0f; isDragging = false }
-                    ) { change, amount ->
-                        change.consume()
-                        dragPx = (dragPx + amount)
-                            .coerceIn(-selected * cellPx,
-                                (names.lastIndex - selected) * cellPx)
-                    }
-                },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            names.forEachIndexed { i, name ->
-                Column(
-                    Modifier.weight(1f).fillMaxHeight()
-                        .clip(RoundedCornerShape(28.dp))
-                        .clickable(
-                            interactionSource = interactionSources[i],
-                            indication = null,
-                            role = Role.Tab
-                        ) {
-                            if (selected != i) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelected(i)
-                            }
-                        },
-                    verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(icons[i], contentDescription = name,
-                        tint = if (selected == i) Blue else Slate,
-                        modifier = Modifier.size(23.dp))
-                    Text(
-                        name,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected == i) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected == i) Blue else Slate
-                    )
-                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Ink,
+                    maxLines = 1
+                )
             }
         }
     }
