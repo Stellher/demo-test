@@ -68,6 +68,11 @@ import kotlin.math.roundToInt
 val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 val LocalAnimePreviewHandler = staticCompositionLocalOf<((AnimeCard) -> Unit)?> { null }
 
+/**
+ * Binds Bangumi click semantics to the actual, unchanged Kyant Catalog
+ * LiquidButton. Not a visual imitation: all glass shading, dragged
+ * highlights and press deformation live in Kyant's original component.
+ */
 @Composable
 fun LiquidAction(
     onClick: () -> Unit,
@@ -79,66 +84,30 @@ fun LiquidAction(
     content: @Composable RowScope.() -> Unit
 ) {
     val backdrop = LocalGlassBackdrop.current
-    val source = remember { MutableInteractionSource() }
-    val isPressed by source.collectIsPressedAsState()
-    val pressed by animateFloatAsState(
-        targetValue = if (isPressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 360f),
-        label = "liquidActionPress"
-    )
-    val shape = RoundedCornerShape(radius)
-    val material = if (backdrop == null) {
-        Modifier.background(
-            if (selected) Color(0xE2D9E7FF) else Color(0xDDFDFDFF), shape
+    if (backdrop != null) {
+        com.kyant.backdrop.catalog.components.LiquidButton(
+            onClick = { if (enabled) onClick() },
+            backdrop = backdrop,
+            modifier = modifier.alpha(if (enabled) 1f else 0.45f),
+            isInteractive = enabled,
+            // The official component uses blend-mode Hue for tint.
+            tint = if (selected) Blue else Color.Unspecified,
+            surfaceColor = if (selected) Color.Unspecified else Color.White.copy(alpha = .24f),
+            content = content
         )
     } else {
-        Modifier.drawBackdrop(
-            backdrop = backdrop,
-            shape = { shape },
-            effects = {
-                vibrancy()
-                blur((3f + pressed * 2f).dp.toPx())
-                lens(
-                    (12f + pressed * 8f).dp.toPx(),
-                    (18f + pressed * 8f).dp.toPx(),
-                    chromaticAberration = pressed > .03f
-                )
-            },
-            highlight = {
-                Highlight.Default.copy(alpha = .23f + pressed * .62f)
-            },
-            shadow = { Shadow(radius = 5.dp, alpha = .28f) },
-            innerShadow = { InnerShadow(radius = 7.dp * pressed, alpha = pressed * .45f) },
-            layerBlock = {
-                // Critically: use drawBackdrop.layerBlock, NOT graphicsLayer
-                // outside it, otherwise backdrop coordinates scale incorrectly.
-                scaleX = 1f - pressed * .055f
-                scaleY = 1f - pressed * .055f
-            },
-            onDrawSurface = {
-                drawRect(if (selected) Color(0xACE6EDFF) else Color(0x91FFFFFF))
-                if (pressed > .01f) drawRect(Color.White.copy(alpha = .08f * pressed))
-            }
+        Row(
+            modifier
+                .alpha(if (enabled) 1f else .45f)
+                .clip(RoundedCornerShape(radius))
+                .background(if (selected) Blue.copy(alpha = .19f) else Color(0xDAFFFFFF))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(contentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            content = content
         )
     }
-    Row(
-        modifier
-            .shadow(if (selected) 7.dp else 2.dp, shape, ambientColor = Blue.copy(alpha = .12f))
-            .then(material)
-            .border(1.dp, Color.White.copy(alpha = .83f), shape)
-            .clip(shape)
-            .clickable(
-                enabled = enabled,
-                role = Role.Button,
-                interactionSource = source,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(contentPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        content = content
-    )
 }
 
 @Composable
@@ -188,6 +157,11 @@ fun LiquidTextAction(
  * chromatic-aberration-on-press. Only one glass indicator is drawn for the rail
  * regardless of how many segments are present.
  */
+/**
+ * Uses the exact Kyant LiquidBottomTabs glass rail / dragged lens and
+ * LiquidBottomTab gesture components as a segmented selector. It intentionally
+ * shares the official tab physics instead of a home-made thumb.
+ */
 @Composable
 fun LiquidSegmented(
     titles: List<String>,
@@ -198,145 +172,44 @@ fun LiquidSegmented(
 ) {
     if (titles.isEmpty()) return
     val backdrop = LocalGlassBackdrop.current
-    val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    val safeIndex = selectedIndex.coerceIn(0, titles.lastIndex)
-    val capsule = RoundedCornerShape(24.dp)
-    val railBackdrop = rememberLayerBackdrop()
-    var dragPx by remember { mutableFloatStateOf(0f) }
-    var dragging by remember { mutableStateOf(false) }
-    val dragPress by animateFloatAsState(
-        if (dragging) 1f else 0f,
-        spring(dampingRatio = .62f, stiffness = 340f),
-        label = "segmentDrag"
-    )
-    val height = if (compact) 48.dp else 54.dp
-    BoxWithConstraints(modifier.fillMaxWidth().height(height)) {
-        val segmentWidth = (maxWidth - 8.dp) / titles.size
-        val segmentPx = with(density) { segmentWidth.toPx() }
-        val position by animateDpAsState(
-            segmentWidth * safeIndex,
-            spring(dampingRatio = .72f, stiffness = 400f),
-            label = "segmentSelectedPosition"
-        )
-        // Rail material, captured separately to provide the refractive thumb a
-        // combined backdrop instead of recursively sampling its own content.
-        Box(
-            Modifier.fillMaxSize().clip(capsule)
-                .drawBackdropIfAvailable(backdrop, capsule, Color(0xADFFFFFF))
-        )
-        Box(Modifier.matchParentSize().layerBackdrop(railBackdrop).alpha(0f)) {
-            Box(Modifier.fillMaxSize().background(Color(0x55E8EEFD), capsule))
+    val actual = selectedIndex.coerceIn(0, titles.lastIndex)
+    if (backdrop == null) {
+        Row(modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            titles.forEachIndexed { i, title ->
+                Text(
+                    title,
+                    modifier = Modifier
+                        .background(if (i == actual) Color(0xFFD7E6FF) else Color.White)
+                        .clickable { onSelected(i) }.padding(9.dp),
+                    color = Ink, style = MaterialTheme.typography.labelMedium
+                )
+            }
         }
-        val thumbBackdrop = if (backdrop != null) {
-            rememberCombinedBackdrop(backdrop, railBackdrop)
-        } else null
-        Box(
-            Modifier.padding(4.dp)
-                .offset(x = position + with(density) { dragPx.toDp() })
-                .width(segmentWidth)
-                .fillMaxHeight()
-                .then(if (thumbBackdrop == null) {
-                    Modifier.background(Color(0xD9E1E9FF), RoundedCornerShape(21.dp))
-                } else {
-                    Modifier.drawBackdrop(
-                        backdrop = thumbBackdrop,
-                        shape = { RoundedCornerShape(21.dp) },
-                        effects = {
-                            vibrancy()
-                            blur((2f + dragPress * 2f).dp.toPx())
-                            lens(
-                                (9f + dragPress * 4f).dp.toPx(),
-                                (14f + dragPress * 7f).dp.toPx(),
-                                chromaticAberration = dragPress > .05f
-                            )
-                        },
-                        highlight = { Highlight.Default.copy(alpha = .35f + .55f * dragPress) },
-                        shadow = { Shadow(radius = 6.dp, alpha = .35f) },
-                        innerShadow = {
-                            InnerShadow(radius = 7.dp * dragPress, alpha = dragPress)
-                        },
-                        layerBlock = {
-                            scaleX = 1f + dragPress * .15f
-                            scaleY = 1f - dragPress * .08f
-                        },
-                        onDrawSurface = {
-                            drawRect(Color(0xB7DFE9FF))
-                        }
-                    )
-                })
-                .border(1.dp, Color.White.copy(alpha = .86f), RoundedCornerShape(21.dp))
-        )
-        Row(
-            Modifier.fillMaxSize().padding(4.dp).pointerInput(safeIndex, segmentPx) {
-                detectHorizontalDragGestures(
-                    onDragStart = { dragging = true },
-                    onDragEnd = {
-                        val next = (safeIndex + (dragPx / segmentPx).roundToInt())
-                            .coerceIn(0, titles.lastIndex)
-                        dragPx = 0f
-                        dragging = false
-                        if (next != safeIndex) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelected(next)
-                        }
-                    },
-                    onDragCancel = { dragPx = 0f; dragging = false }
-                ) { change, amount ->
-                    change.consume()
-                    dragPx = (dragPx + amount)
-                        .coerceIn(-safeIndex * segmentPx,
-                            (titles.lastIndex - safeIndex) * segmentPx)
-                }
-            },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            titles.forEachIndexed { index, name ->
-                Box(
-                    Modifier.weight(1f).fillMaxHeight()
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable(
-                            role = Role.Tab,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            if (safeIndex != index) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelected(index)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        name,
-                        color = if (safeIndex == index) Blue else Slate,
-                        fontWeight = if (safeIndex == index) FontWeight.Bold else FontWeight.Medium,
-                        style = if (compact) MaterialTheme.typography.labelSmall
-                            else MaterialTheme.typography.labelMedium,
-                        maxLines = 1
-                    )
-                }
+        return
+    }
+    com.kyant.backdrop.catalog.components.LiquidBottomTabs(
+        selectedTabIndex = { actual },
+        onTabSelected = onSelected,
+        backdrop = backdrop,
+        tabsCount = titles.size,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        titles.forEachIndexed { index, title ->
+            com.kyant.backdrop.catalog.components.LiquidBottomTab(
+                onClick = { onSelected(index) }
+            ) {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = if (compact) MaterialTheme.typography.labelSmall
+                        else MaterialTheme.typography.labelMedium,
+                    fontWeight = if (index == actual) FontWeight.SemiBold else FontWeight.Medium,
+                    color = Ink
+                )
             }
         }
     }
-}
-
-private fun Modifier.drawBackdropIfAvailable(
-    backdrop: Backdrop?,
-    shape: RoundedCornerShape,
-    tint: Color
-): Modifier {
-    return if (backdrop == null) background(tint, shape)
-    else drawBackdrop(
-        backdrop = backdrop,
-        shape = { shape },
-        effects = {
-            vibrancy()
-            blur(6.dp.toPx())
-            lens(16.dp.toPx(), 17.dp.toPx())
-        },
-        onDrawSurface = { drawRect(tint) }
-    )
 }
 
 /** Shared premium glass panel for key summaries, not every scrolling list row. */
