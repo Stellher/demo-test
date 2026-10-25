@@ -1,36 +1,36 @@
 {
   "repository": "huangxd-/danmu_api",
   "ref": "main",
-  "commit": "5ef63a01bae7c4bad4dcd7bafbbcdcf33aa82564",
-  "shortCommit": "5ef63a01bae7",
+  "commit": "4d325e096bbbf0c1ff261a9bfa638f7c58784f60",
+  "shortCommit": "4d325e096bbb",
   "policy": "auto-follow-upstream",
   "sourceModification": "none",
   "dependencyLockPolicy": "per-abi-committed",
   "dependencyMode": "per-abi",
-  "releaseTag": "logvar-runtime-5ef63a01bae7",
-  "releaseUrl": "https://github.com/Stellher/demo-test/releases/tag/logvar-runtime-5ef63a01bae7",
-  "manifestSha256": "755a7ea00a4036581b06df5f8829fc405e30e4c42210c9c0612752cfde90f370",
+  "releaseTag": "logvar-runtime-4d325e096bbb",
+  "releaseUrl": "https://github.com/Stellher/demo-test/releases/tag/logvar-runtime-4d325e096bbb",
+  "manifestSha256": "e0a1d0ee31f9881c4e18104bf098d01fb71db3a71496cc3ae532fe21af9bc85b",
   "artifacts": {
     "arm64-v8a": {
-      "file": "logvar-runtime-arm64-v8a-5ef63a01bae7.zip",
-      "sha256": "bb40414c9c7d0952159c4aaae49a007485ecfc25e2edd0b63ffc87812cb1033d",
-      "bytes": 31060841,
-      "dependencyTreeSha256": "23334b1786f27980349563d367b3e923a2a3ccf56b713856d1d2e5665d203a9a",
-      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-5ef63a01bae7/logvar-runtime-arm64-v8a-5ef63a01bae7.zip"
+      "file": "logvar-runtime-arm64-v8a-4d325e096bbb.zip",
+      "sha256": "6994b9cddb5e949407032587f8ea0b9aa6f2e000620f69cb80a13ec66873617e",
+      "bytes": 29726547,
+      "dependencyTreeSha256": "aa507281dc56d1182e4e50d4063680b84418c77ac92d7f9780f2b4b15e182cbe",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-4d325e096bbb/logvar-runtime-arm64-v8a-4d325e096bbb.zip"
     },
     "armeabi-v7a": {
-      "file": "logvar-runtime-armeabi-v7a-5ef63a01bae7.zip",
-      "sha256": "a742e6a3453c11818e24c4c7ace5111f1b1ab1cfe6f34abaaac295084cc3ba3f",
-      "bytes": 30219536,
-      "dependencyTreeSha256": "ca48ea5c0c8d87553ffc3ed8962a05113eea20295b2ee6eadfe07f94f684e7d8",
-      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-5ef63a01bae7/logvar-runtime-armeabi-v7a-5ef63a01bae7.zip"
+      "file": "logvar-runtime-armeabi-v7a-4d325e096bbb.zip",
+      "sha256": "280cb62e2661e90b44d6d270a3722fdaf3cc4086bfa2c8a08bfbefd9ace97423",
+      "bytes": 28885242,
+      "dependencyTreeSha256": "0e2005db2575cce8df12381e019f119f7d7cf4ceb7f10d77a4828491f6137b3b",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-4d325e096bbb/logvar-runtime-armeabi-v7a-4d325e096bbb.zip"
     },
     "x86_64": {
-      "file": "logvar-runtime-x86_64-5ef63a01bae7.zip",
-      "sha256": "28f321f0dad5e221787feb18558d4449e456d319cad2c29d761841c0b4b31e8c",
-      "bytes": 30219541,
-      "dependencyTreeSha256": "0605ed9e0e7028ab2b1041e645d0566a99e7f94c1576529b042be2b07b201b59",
-      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-5ef63a01bae7/logvar-runtime-x86_64-5ef63a01bae7.zip"
+      "file": "logvar-runtime-x86_64-4d325e096bbb.zip",
+      "sha256": "21698333f4fa91a92e8aa039ac08f2393d6de5aabec4f1e707246c0e615c5fde",
+      "bytes": 28885245,
+      "dependencyTreeSha256": "70c08be24154854c33cff06f46f8718fe430fee4a66caacc9e0236ca1a50fcd6",
+      "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-4d325e096bbb/logvar-runtime-x86_64-4d325e096bbb.zip"
     }
   }
 }
