@@ -5,6 +5,9 @@ on:
     branches: [ main ]
     paths:
       - ".github/workflows/watch-logvar-upstream.yml"
+      - ".github/scripts/package_logvar_runtime.py"
+      - ".github/scripts/package_logvar_windows_runtime.py"
+      - ".github/scripts/package_windows_node_runtime.py"
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
@@ -15,6 +18,10 @@ permissions:
 concurrency:
   group: logvar-upstream-sync
   cancel-in-progress: false
+
+env:
+  WINDOWS_NODE_VERSION: "24.21.0"
+  WINDOWS_NODE_UPSTREAM_SHA256: "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541"
 
 jobs:
   sync-runtime:
@@ -34,6 +41,8 @@ jobs:
           REPOSITORY="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["repository"])')"
           REF="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["ref"])')"
           CURRENT="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json")).get("commit", ""))')"
+          HAS_WINDOWS="$(python3 -c 'import json; d=json.load(open(".runtime/logvar-upstream.json")); print("true" if d.get("windows", {}).get("x86_64", {}).get("node") and d.get("windows", {}).get("x86_64", {}).get("logvar") else "false")')"
+
           SHA="$(git ls-remote "https://github.com/$REPOSITORY.git" "refs/heads/$REF" | awk '{print $1}')"
           test -n "$SHA"
 
@@ -47,12 +56,12 @@ jobs:
           echo "short=$SHORT" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-          if [ "$SHA" = "$CURRENT" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Upstream is unchanged: $SHA"
-          else
+          if [ "$SHA" != "$CURRENT" ] || [ "$HAS_WINDOWS" != "true" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Upstream changed: $CURRENT -> $SHA"
+            echo "Runtime sync required: current=$CURRENT upstream=$SHA windows=$HAS_WINDOWS"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Runtime metadata already current: $SHA"
           fi
 
       - name: Checkout exact upstream source
@@ -76,7 +85,7 @@ jobs:
           set -euo pipefail
           mkdir -p out
 
-          build_deps() {
+          build_android_deps() {
             ABI="$1"
             CPU="$2"
             TARGET="work/logvar-$ABI"
@@ -87,15 +96,59 @@ jobs:
 
             (
               cd "$TARGET"
-              npm install                 --omit=dev                 --ignore-scripts                 --package-lock=true                 --no-audit                 --no-fund                 --os=android                 --cpu="$CPU"
+              npm install \
+                --omit=dev \
+                --ignore-scripts \
+                --package-lock=true \
+                --no-audit \
+                --no-fund \
+                --os=android \
+                --cpu="$CPU"
             )
 
             cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
           }
 
-          build_deps arm64-v8a arm64
-          build_deps armeabi-v7a arm
-          build_deps x86_64 x64
+          build_android_deps arm64-v8a arm64
+          build_android_deps armeabi-v7a arm
+          build_android_deps x86_64 x64
+
+      - name: Resolve Windows x86_64 dependencies
+        if: steps.meta.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET="work/logvar-win-x86_64"
+          rm -rf "$TARGET"
+          mkdir -p "$TARGET"
+          cp work/logvar-source/package.json "$TARGET/package.json"
+
+          (
+            cd "$TARGET"
+            npm install \
+              --omit=dev \
+              --ignore-scripts \
+              --package-lock=true \
+              --no-audit \
+              --no-fund \
+              --os=win32 \
+              --cpu=x64
+          )
+
+          cp "$TARGET/package-lock.json" "out/dependency-lock-win-x86_64.json"
+
+      - name: Download official Windows Node x86_64
+        if: steps.meta.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl -L --fail --retry 5 --retry-delay 2 \
+            -o work/node-win-x64.zip \
+            "https://nodejs.org/dist/v$WINDOWS_NODE_VERSION/node-v$WINDOWS_NODE_VERSION-win-x64.zip"
+
+          echo "$WINDOWS_NODE_UPSTREAM_SHA256  work/node-win-x64.zip" | sha256sum -c -
 
       - name: Verify upstream source stayed untouched
         if: steps.meta.outputs.changed == 'true'
@@ -105,12 +158,26 @@ jobs:
           test -z "$(git -C work/logvar-source status --porcelain)"
           git -C work/logvar-source rev-parse HEAD | grep -Fx "${{ steps.meta.outputs.sha }}"
 
-      - name: Package LogVar Runtime
+      - name: Package Android LogVar Runtime
         if: steps.meta.outputs.changed == 'true'
         env:
           LOGVAR_REPOSITORY: ${{ steps.meta.outputs.repository }}
           LOGVAR_COMMIT: ${{ steps.meta.outputs.sha }}
         run: python3 .github/scripts/package_logvar_runtime.py
+
+      - name: Package Windows Node Runtime
+        if: steps.meta.outputs.changed == 'true'
+        env:
+          WINDOWS_NODE_VERSION: ${{ env.WINDOWS_NODE_VERSION }}
+          WINDOWS_NODE_UPSTREAM_SHA256: ${{ env.WINDOWS_NODE_UPSTREAM_SHA256 }}
+        run: python3 .github/scripts/package_windows_node_runtime.py
+
+      - name: Package Windows LogVar Runtime
+        if: steps.meta.outputs.changed == 'true'
+        env:
+          LOGVAR_REPOSITORY: ${{ steps.meta.outputs.repository }}
+          LOGVAR_COMMIT: ${{ steps.meta.outputs.sha }}
+        run: python3 .github/scripts/package_logvar_windows_runtime.py
 
       - name: Generate checksums
         if: steps.meta.outputs.changed == 'true'
@@ -127,33 +194,60 @@ jobs:
           UPSTREAM_COMMIT: ${{ steps.meta.outputs.sha }}
           UPSTREAM_SHORT: ${{ steps.meta.outputs.short }}
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          WINDOWS_NODE_VERSION: ${{ env.WINDOWS_NODE_VERSION }}
         run: |
+          import hashlib
           import json
           import os
           import shutil
           from pathlib import Path
 
-          manifest = json.loads(Path("out/logvar-runtime-manifest.json").read_text(encoding="utf-8"))
+          android_manifest = json.loads(
+              Path("out/logvar-runtime-manifest.json").read_text(encoding="utf-8")
+          )
+          windows_logvar_manifest = json.loads(
+              Path("out/logvar-runtime-windows-manifest.json").read_text(encoding="utf-8")
+          )
+          windows_node_manifest = json.loads(
+              Path("out/node-runtime-windows-manifest.json").read_text(encoding="utf-8")
+          )
+
           short = os.environ["UPSTREAM_SHORT"]
+          release_tag = os.environ["RELEASE_TAG"]
+          github_repository = os.environ["GITHUB_REPOSITORY"]
+
           lock_dir = Path(".runtime/locks") / short
           lock_dir.mkdir(parents=True, exist_ok=True)
 
-          for abi in ("arm64-v8a", "armeabi-v7a", "x86_64"):
+          for target in ("arm64-v8a", "armeabi-v7a", "x86_64", "win-x86_64"):
               shutil.copyfile(
-                  Path("out") / f"dependency-lock-{abi}.json",
-                  lock_dir / f"{abi}-package-lock.json",
+                  Path("out") / f"dependency-lock-{target}.json",
+                  lock_dir / f"{target}-package-lock.json",
               )
 
-          release_tag = os.environ["RELEASE_TAG"]
-          github_repository = os.environ["GITHUB_REPOSITORY"]
-          artifacts = {}
-          for key, value in manifest["artifacts"].items():
+          android_artifacts = {}
+          for key, value in android_manifest["artifacts"].items():
               item = dict(value)
               item["url"] = (
                   f"https://github.com/{github_repository}/releases/download/"
                   f"{release_tag}/{item['file']}"
               )
-              artifacts[key] = item
+              android_artifacts[key] = item
+
+          win_logvar = dict(windows_logvar_manifest["artifact"])
+          win_logvar["version"] = short
+          win_logvar["commit"] = os.environ["UPSTREAM_COMMIT"]
+          win_logvar["url"] = (
+              f"https://github.com/{github_repository}/releases/download/"
+              f"{release_tag}/{win_logvar['file']}"
+          )
+
+          win_node = dict(windows_node_manifest["artifact"])
+          win_node["version"] = os.environ["WINDOWS_NODE_VERSION"]
+          win_node["url"] = (
+              f"https://github.com/{github_repository}/releases/download/"
+              f"{release_tag}/{win_node['file']}"
+          )
 
           metadata = {
               "repository": os.environ["UPSTREAM_REPOSITORY"],
@@ -162,14 +256,20 @@ jobs:
               "shortCommit": short,
               "policy": "auto-follow-upstream",
               "sourceModification": "none",
-              "dependencyLockPolicy": "per-abi-committed",
-              "dependencyMode": manifest["dependencyMode"],
+              "dependencyLockPolicy": "per-target-committed",
+              "dependencyMode": android_manifest["dependencyMode"],
               "releaseTag": release_tag,
               "releaseUrl": f"https://github.com/{github_repository}/releases/tag/{release_tag}",
-              "manifestSha256": __import__("hashlib").sha256(
+              "manifestSha256": hashlib.sha256(
                   Path("out/logvar-runtime-manifest.json").read_bytes()
               ).hexdigest(),
-              "artifacts": artifacts,
+              "artifacts": android_artifacts,
+              "windows": {
+                  "x86_64": {
+                      "node": win_node,
+                      "logvar": win_logvar,
+                  }
+              },
           }
 
           Path(".runtime/logvar-upstream.json").write_text(
@@ -188,7 +288,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add .runtime/logvar-upstream.json ".runtime/locks/${{ steps.meta.outputs.short }}"
-          git commit -m "runtime: sync LogVar ${{ steps.meta.outputs.short }} from upstream"
+          git commit -m "runtime: sync LogVar ${{ steps.meta.outputs.short }} with Windows x86_64"
 
           git fetch origin main
           git rebase origin/main
@@ -231,14 +331,25 @@ jobs:
           - Upstream repository: $UPSTREAM_REPOSITORY
           - Upstream commit: $UPSTREAM_SHA
           - Source modification: none
-          - Android ABIs: arm64-v8a, armeabi-v7a, x86_64
-          - Runtime ZIP SHA-256 values are recorded in logvar-runtime-manifest.json and SHA256SUMS.txt
-          - This release only updates repository-side LogVar Runtime assets. Android application source/version is not changed.
+          - Android LogVar: arm64-v8a, armeabi-v7a, x86_64
+          - Windows x86_64 Node: official Node.js v$WINDOWS_NODE_VERSION
+          - Windows x86_64 LogVar: complete upstream source plus win32/x64 node_modules
+          - Runtime ZIP SHA-256 values are recorded in manifests and SHA256SUMS.txt
+          - This release only updates repository-side runtime assets. Android application source/version is not changed.
           EOF
 
           if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG"               --repo "$GH_REPO"               --title "LogVar Runtime ${UPSTREAM_SHA:0:12}"               --notes-file release-notes.md               --prerelease=false
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --title "LogVar Runtime ${UPSTREAM_SHA:0:12}" \
+              --notes-file release-notes.md \
+              --prerelease=false
             gh release upload "$RELEASE_TAG" out/* --repo "$GH_REPO" --clobber
           else
-            gh release create "$RELEASE_TAG"               --repo "$GH_REPO"               --target "${{ steps.commit.outputs.sync_commit }}"               --title "LogVar Runtime ${UPSTREAM_SHA:0:12}"               --notes-file release-notes.md               out/*
+            gh release create "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --target "${{ steps.commit.outputs.sync_commit }}" \
+              --title "LogVar Runtime ${UPSTREAM_SHA:0:12}" \
+              --notes-file release-notes.md \
+              out/*
           fi
