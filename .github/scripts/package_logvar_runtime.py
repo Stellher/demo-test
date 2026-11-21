@@ -11,7 +11,7 @@ WORK = Path(os.environ.get("WORK_DIR", "work"))
 OUT = Path(os.environ.get("OUT_DIR", "out"))
 OUT.mkdir(parents=True, exist_ok=True)
 
-UPSTREAM_REPOSITORY = os.environ.get("LOGVAR_REPOSITORY", "lilixu3/danmu_api")
+UPSTREAM_REPOSITORY = os.environ.get("LOGVAR_REPOSITORY", "huangxd-/danmu_api")
 UPSTREAM_COMMIT = os.environ["LOGVAR_COMMIT"]
 SHORT = UPSTREAM_COMMIT[:12]
 ABIS = ("arm64-v8a", "armeabi-v7a", "x86_64")
