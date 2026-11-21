@@ -5,32 +5,54 @@
   "shortCommit": "619612b896f1",
   "policy": "auto-follow-upstream",
   "sourceModification": "none",
-  "dependencyLockPolicy": "per-abi-committed",
+  "dependencyLockPolicy": "per-target-committed",
   "dependencyMode": "per-abi",
   "releaseTag": "logvar-runtime-619612b896f1",
   "releaseUrl": "https://github.com/Stellher/demo-test/releases/tag/logvar-runtime-619612b896f1",
-  "manifestSha256": "a8dec02a6f917da68c2b4f9e80d3b7fcbf77c1f7a1b9a3b622a8ea1ccc57b968",
+  "manifestSha256": "ad61dc4e6f56c716425c060d728ace646d735000e9f911e1aa8497b0865fe7b4",
   "artifacts": {
     "arm64-v8a": {
       "file": "logvar-runtime-arm64-v8a-619612b896f1.zip",
-      "sha256": "e769dfa90dad2d184730ba777b75f19992d74c1c5e7b659eef36a791d39bbb0a",
-      "bytes": 30257103,
-      "dependencyTreeSha256": "855843ae8bc623a7d70ece6cef51efcf15c50b3d41cefebfa8f5b0ea6399debb",
+      "sha256": "d822fc285ce33b3b3ee324addf7d452d19cf4c0684f033455f4cd155f514c019",
+      "bytes": 30278999,
+      "dependencyTreeSha256": "2fab6d67e057d84a4bb3ef11f090188c58aeca77b49b6d6768e496c43a34f124",
       "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-619612b896f1/logvar-runtime-arm64-v8a-619612b896f1.zip"
     },
     "armeabi-v7a": {
       "file": "logvar-runtime-armeabi-v7a-619612b896f1.zip",
-      "sha256": "2bd20e9998a87c4986758d732ae0a3e0879dc0f72033039a5e95a30adde0aa18",
-      "bytes": 29415801,
-      "dependencyTreeSha256": "528f3c68af823eadfeeee9dda34d75828d98cd9fc8e8a9f56688da157585b171",
+      "sha256": "f50ca0d54978e15d37e45d02f83bf974eda5d52b222556ed673d2c9644a0ee5c",
+      "bytes": 29437697,
+      "dependencyTreeSha256": "6dba0c0c4082117788e940f078a4ac9a54ab0325827ed4631a442a16daa2e33e",
       "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-619612b896f1/logvar-runtime-armeabi-v7a-619612b896f1.zip"
     },
     "x86_64": {
       "file": "logvar-runtime-x86_64-619612b896f1.zip",
-      "sha256": "d8f7d60853864b425a8fcd32b4b0d71219562229633f67e775d794188a366d73",
-      "bytes": 29415804,
-      "dependencyTreeSha256": "2b030f16208e1966c3e5c85a87831cab4c025619071825f699547684fd00b1ae",
+      "sha256": "306301913848f180f146e270edd0e945c850e92075e7d53d34000c55442b3707",
+      "bytes": 29437697,
+      "dependencyTreeSha256": "311abef2c1f0a83a13425fb239824047c28f661598f76391e26bfb4b2c3632b6",
       "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-619612b896f1/logvar-runtime-x86_64-619612b896f1.zip"
+    }
+  },
+  "windows": {
+    "x86_64": {
+      "node": {
+        "file": "node-runtime-win-x86_64-24.21.0.zip",
+        "sha256": "a86cb14ec0afa7b1208e4c7055a9b6b84691aa084017614f0d41410d2e63acce",
+        "bytes": 34955271,
+        "version": "24.21.0",
+        "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-619612b896f1/node-runtime-win-x86_64-24.21.0.zip"
+      },
+      "logvar": {
+        "file": "logvar-runtime-win-x86_64-619612b896f1.zip",
+        "sha256": "e05cfa6ddd7e436aefe2b8b61b9ac23bc20fa557f74e698ab094a104db69e822",
+        "bytes": 30569502,
+        "dependencyTreeSha256": "34c77d425a429c9c647dd2eb4c4c187a894d8c019caf1d6efcf7055ae0e7d79e",
+        "dependencyLockSha256": "9a09bcf1ad196f1580c6bc375fc72d5b6e8af071cfd55e496347365981122b5f",
+        "nativeFileCount": 1,
+        "version": "619612b896f1",
+        "commit": "619612b896f1a83b39a34d7e0775bf1711d0e45b",
+        "url": "https://github.com/Stellher/demo-test/releases/download/logvar-runtime-619612b896f1/logvar-runtime-win-x86_64-619612b896f1.zip"
+      }
     }
   }
 }
