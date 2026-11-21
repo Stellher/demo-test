@@ -30,6 +30,7 @@ jobs:
       - name: Checkout runtime repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Resolve upstream state
@@ -42,6 +43,7 @@ jobs:
           REF="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json"))["ref"])')"
           CURRENT="$(python3 -c 'import json; print(json.load(open(".runtime/logvar-upstream.json")).get("commit", ""))')"
           HAS_WINDOWS="$(python3 -c 'import json; d=json.load(open(".runtime/logvar-upstream.json")); print("true" if d.get("windows", {}).get("x86_64", {}).get("node") and d.get("windows", {}).get("x86_64", {}).get("logvar") else "false")')"
+          SCHEMA="$(python3 -c 'import json; d=json.load(open(".runtime/logvar-upstream.json")); print(int(d.get("packagingSchemaVersion", 0)))')"
 
           SHA="$(git ls-remote "https://github.com/$REPOSITORY.git" "refs/heads/$REF" | awk '{print $1}')"
           test -n "$SHA"
@@ -56,9 +58,9 @@ jobs:
           echo "short=$SHORT" >> "$GITHUB_OUTPUT"
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
-          if [ "$SHA" != "$CURRENT" ] || [ "$HAS_WINDOWS" != "true" ]; then
+          if [ "$SHA" != "$CURRENT" ] || [ "$HAS_WINDOWS" != "true" ] || [ "$SCHEMA" -lt 2 ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Runtime sync required: current=$CURRENT upstream=$SHA windows=$HAS_WINDOWS"
+            echo "Runtime sync required: current=$CURRENT upstream=$SHA windows=$HAS_WINDOWS schema=$SCHEMA"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Runtime metadata already current: $SHA"
@@ -89,22 +91,37 @@ jobs:
             ABI="$1"
             CPU="$2"
             TARGET="work/logvar-$ABI"
+            LOCK=".runtime/locks/${{ steps.meta.outputs.short }}/$ABI-package-lock.json"
 
             rm -rf "$TARGET"
             mkdir -p "$TARGET"
             cp work/logvar-source/package.json "$TARGET/package.json"
 
-            (
-              cd "$TARGET"
-              npm install \
-                --omit=dev \
-                --ignore-scripts \
-                --package-lock=true \
-                --no-audit \
-                --no-fund \
-                --os=android \
-                --cpu="$CPU"
-            )
+            if [ -f "$LOCK" ]; then
+              cp "$LOCK" "$TARGET/package-lock.json"
+              (
+                cd "$TARGET"
+                npm ci \
+                  --omit=dev \
+                  --ignore-scripts \
+                  --no-audit \
+                  --no-fund \
+                  --os=android \
+                  --cpu="$CPU"
+              )
+            else
+              (
+                cd "$TARGET"
+                npm install \
+                  --omit=dev \
+                  --ignore-scripts \
+                  --package-lock=true \
+                  --no-audit \
+                  --no-fund \
+                  --os=android \
+                  --cpu="$CPU"
+              )
+            fi
 
             cp "$TARGET/package-lock.json" "out/dependency-lock-$ABI.json"
           }
@@ -120,21 +137,37 @@ jobs:
           set -euo pipefail
 
           TARGET="work/logvar-win-x86_64"
+          LOCK=".runtime/locks/${{ steps.meta.outputs.short }}/win-x86_64-package-lock.json"
+
           rm -rf "$TARGET"
           mkdir -p "$TARGET"
           cp work/logvar-source/package.json "$TARGET/package.json"
 
-          (
-            cd "$TARGET"
-            npm install \
-              --omit=dev \
-              --ignore-scripts \
-              --package-lock=true \
-              --no-audit \
-              --no-fund \
-              --os=win32 \
-              --cpu=x64
-          )
+          if [ -f "$LOCK" ]; then
+            cp "$LOCK" "$TARGET/package-lock.json"
+            (
+              cd "$TARGET"
+              npm ci \
+                --omit=dev \
+                --ignore-scripts \
+                --no-audit \
+                --no-fund \
+                --os=win32 \
+                --cpu=x64
+            )
+          else
+            (
+              cd "$TARGET"
+              npm install \
+                --omit=dev \
+                --ignore-scripts \
+                --package-lock=true \
+                --no-audit \
+                --no-fund \
+                --os=win32 \
+                --cpu=x64
+            )
+          fi
 
           cp "$TARGET/package-lock.json" "out/dependency-lock-win-x86_64.json"
 
@@ -250,6 +283,7 @@ jobs:
           )
 
           metadata = {
+              "packagingSchemaVersion": 2,
               "repository": os.environ["UPSTREAM_REPOSITORY"],
               "ref": os.environ["UPSTREAM_REF"],
               "commit": os.environ["UPSTREAM_COMMIT"],
